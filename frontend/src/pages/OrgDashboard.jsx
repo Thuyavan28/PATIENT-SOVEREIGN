@@ -820,104 +820,204 @@ export default function OrgDashboard() {
         )}
       </main>
 
-      {/* VIEW SCOPED DATA MODAL */}
+      {/* VIEW SCOPED DATA MODAL — Full 3-way handshake result */}
       {viewDataModalOpen && scopedDataPayload && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-black rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col p-6 animate-fadeSlideIn">
-            <div className="flex items-center justify-between pb-3 border-b border-black">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <RiShieldCheckLine className="text-xl text-[#16A34A]" />
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#16A34A]">
-                    RSA-2048 Signature Cryptographically Verified
-                  </span>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white border border-black rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-fadeSlideIn">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-black shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-[#0A0A0A] rounded-lg flex items-center justify-center">
+                  <RiShieldCheckLine className="text-white text-base" />
                 </div>
-                <h3 className="text-base font-bold text-[#0A0A0A] mt-0.5">
-                  Authorized Patient Data: {scopedDataPayload.patient_name}
-                </h3>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-mono font-bold text-[#16A34A] uppercase tracking-widest">RSA Signature Verified</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] inline-block animate-pulse" />
+                  </div>
+                  <h3 className="text-sm font-bold text-[#0A0A0A] leading-tight">
+                    Scoped Data — {scopedDataPayload.patient_name}
+                  </h3>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <span className="text-[10px] font-mono text-[#555555]">
+                  Expires: {new Date(scopedDataPayload.expires_at).toLocaleString()}
+                </span>
+                <button onClick={() => setViewDataModalOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-[#555555] hover:text-[#0A0A0A] transition-colors">
+                  <RiCloseLine className="text-lg" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 text-xs">
+
+              {/* AI Drug Safety Panel */}
+              {scopedDataPayload.ai_safety && (
+                <div className={`p-4 rounded-xl border space-y-3 ${
+                  scopedDataPayload.ai_safety.safe
+                    ? 'bg-green-50 border-[#16A34A]'
+                    : 'bg-red-50 border-[#EF4444]'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <RiShieldCheckLine className={`text-base ${scopedDataPayload.ai_safety.safe ? 'text-[#16A34A]' : 'text-[#EF4444]'}`} />
+                      <span className={`text-xs font-bold ${scopedDataPayload.ai_safety.safe ? 'text-[#16A34A]' : 'text-[#EF4444]'}`}>
+                        AI Clinical Safety Analysis
+                      </span>
+                    </div>
+                    <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full border ${
+                      scopedDataPayload.ai_safety.safe
+                        ? 'bg-white text-[#16A34A] border-[#16A34A]'
+                        : 'bg-white text-[#EF4444] border-[#EF4444]'
+                    }`}>
+                      {scopedDataPayload.ai_safety.safe ? '✓ No Critical Interactions' : '⚠ Interactions Detected'}
+                    </span>
+                  </div>
+
+                  {/* Interactions */}
+                  {scopedDataPayload.ai_safety.interactions?.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#555555]">Drug-Drug Interactions</p>
+                      {scopedDataPayload.ai_safety.interactions.map((intx, i) => (
+                        <div key={i} className="p-2.5 bg-white border border-black rounded-lg">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-bold text-[#0A0A0A]">{intx.drugs?.join(' + ')}</span>
+                            <span className={`text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded ${
+                              intx.severity === 'high' ? 'bg-red-100 text-[#EF4444]' :
+                              intx.severity === 'medium' ? 'bg-amber-100 text-[#F59E0B]' :
+                              'bg-gray-100 text-[#555555]'
+                            }`}>{intx.severity}</span>
+                          </div>
+                          <p className="text-[#555555] leading-relaxed">{intx.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Allergy conflicts */}
+                  {scopedDataPayload.ai_safety.allergy_conflicts?.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#555555]">Allergy Conflicts</p>
+                      {scopedDataPayload.ai_safety.allergy_conflicts.map((ac, i) => (
+                        <div key={i} className="p-2.5 bg-white border border-[#EF4444] rounded-lg">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <RiAlertLine className="text-[#EF4444] text-sm shrink-0" />
+                            <span className="font-bold text-[#0A0A0A]">{ac.drug}</span>
+                            <span className="text-[#555555]">conflicts with allergy to</span>
+                            <span className="font-bold text-[#EF4444]">{ac.allergy}</span>
+                          </div>
+                          <p className="text-[#555555] leading-relaxed">{ac.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {scopedDataPayload.ai_safety.safe && (
+                    <p className="text-xs text-[#16A34A]">No critical drug-drug interactions or allergy conflicts detected in this prescription set.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Patient Profile */}
+              {scopedDataPayload.scoped_data?.patient_profile && (
+                <div className="p-4 bg-gray-50 border border-black rounded-xl">
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-[#555555] mb-3">Patient Profile</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      ['Blood Group', scopedDataPayload.scoped_data.patient_profile.blood_group],
+                      ['Gender', scopedDataPayload.scoped_data.patient_profile.gender],
+                      ['Date of Birth', scopedDataPayload.scoped_data.patient_profile.date_of_birth]
+                    ].map(([label, val]) => (
+                      <div key={label}>
+                        <span className="text-[#555555] block mb-0.5">{label}</span>
+                        <span className="font-bold text-[#0A0A0A]">{val || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Prescriptions */}
+              {scopedDataPayload.scoped_data?.prescriptions?.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#0A0A0A] border-b border-gray-200 pb-1.5">
+                    Prescriptions ({scopedDataPayload.scoped_data.prescriptions.length})
+                  </h4>
+                  {scopedDataPayload.scoped_data.prescriptions.map((rx, i) => (
+                    <div key={i} className="p-3.5 bg-gray-50 border border-black rounded-xl space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-[#0A0A0A]">{rx.drug_name}</span>
+                        <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full border ${
+                          rx.status === 'active'
+                            ? 'bg-green-50 text-[#16A34A] border-green-200'
+                            : 'bg-gray-100 text-[#555555] border-gray-200'
+                        }`}>{rx.status}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[#555555]">
+                        <span>Dosage: <span className="font-medium text-[#0A0A0A]">{rx.dosage}</span></span>
+                        <span>Frequency: <span className="font-medium text-[#0A0A0A]">{rx.frequency}</span></span>
+                        <span>Duration: <span className="font-medium text-[#0A0A0A]">{rx.duration}</span></span>
+                      </div>
+                      {rx.diagnosis && <p className="text-[#555555]">Diagnosis: <span className="font-medium text-[#0A0A0A]">{rx.diagnosis}</span></p>}
+                      <div className="flex items-center justify-between text-[#777777] font-mono text-[10px]">
+                        <span>Dr. {rx.doctor_name || 'Unknown'}</span>
+                        <span>{rx.issued_date ? new Date(rx.issued_date).toLocaleDateString() : ''} → {rx.expiry_date ? new Date(rx.expiry_date).toLocaleDateString() : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Allergies */}
+              {scopedDataPayload.scoped_data?.allergies?.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#0A0A0A] border-b border-gray-200 pb-1.5">
+                    Allergies ({scopedDataPayload.scoped_data.allergies.length})
+                  </h4>
+                  {scopedDataPayload.scoped_data.allergies.map((a, i) => (
+                    <div key={i} className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-[#0A0A0A]">{a.name || a}</span>
+                        {a.reaction && <span className="text-[#555555] ml-2">— {a.reaction}</span>}
+                      </div>
+                      {a.severity && <span className="text-[10px] font-mono font-bold uppercase text-[#EF4444]">{a.severity}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Current Medications */}
+              {scopedDataPayload.scoped_data?.current_medications?.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#0A0A0A] border-b border-gray-200 pb-1.5">
+                    Current Medications ({scopedDataPayload.scoped_data.current_medications.length})
+                  </h4>
+                  {scopedDataPayload.scoped_data.current_medications.map((m, i) => (
+                    <div key={i} className="p-3 bg-gray-50 border border-black rounded-xl flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-[#0A0A0A]">{m.name || m}</span>
+                        {m.dosage && <span className="text-[#555555] ml-2">{m.dosage} · {m.frequency}</span>}
+                      </div>
+                      {m.prescribed_by && <span className="text-[10px] text-[#555555] font-mono">Dr. {m.prescribed_by}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-black shrink-0">
+              <div className="flex items-center space-x-1.5 text-[10px] font-mono text-[#555555]">
+                <RiShieldCheckLine className="text-xs" />
+                <span>Identity ≠ Authorization ≠ Access · Strictly scoped release</span>
               </div>
               <button
                 onClick={() => setViewDataModalOpen(false)}
-                className="text-[#555555] hover:text-[#0A0A0A]"
-              >
-                <RiCloseLine className="text-2xl" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto py-4 space-y-6 text-xs">
-              {scopedDataPayload.scoped_data?.patient_profile && (
-                <div className="p-3 bg-gray-50 border border-black rounded-xl grid grid-cols-3 gap-3">
-                  <div>
-                    <span className="text-[#555555] block">Blood Group:</span>
-                    <span className="font-semibold text-[#0A0A0A]">
-                      {scopedDataPayload.scoped_data.patient_profile.blood_group || '—'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#555555] block">Gender:</span>
-                    <span className="font-semibold text-[#0A0A0A]">
-                      {scopedDataPayload.scoped_data.patient_profile.gender || '—'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#555555] block">Date of Birth:</span>
-                    <span className="font-semibold text-[#0A0A0A]">
-                      {scopedDataPayload.scoped_data.patient_profile.date_of_birth || '—'}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {scopedDataPayload.scoped_data?.allergies && (
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-[#0A0A0A] uppercase tracking-wider text-[11px] border-b pb-1">
-                    Authorized Allergies ({scopedDataPayload.scoped_data.allergies.length})
-                  </h4>
-                  <div className="space-y-1.5">
-                    {scopedDataPayload.scoped_data.allergies.map((a, idx) => (
-                      <div key={idx} className="p-2.5 bg-red-50/50 border border-red-200 rounded-xl flex justify-between">
-                        <div>
-                          <span className="font-bold text-[#0A0A0A]">{a.name}</span>
-                          {a.reaction && <span className="text-[#555555] ml-2">— {a.reaction}</span>}
-                        </div>
-                        <span className="text-[10px] font-mono font-bold uppercase text-[#EF4444]">
-                          {a.severity}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {scopedDataPayload.scoped_data?.current_medications && (
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-[#0A0A0A] uppercase tracking-wider text-[11px] border-b pb-1">
-                    Authorized Current Medications ({scopedDataPayload.scoped_data.current_medications.length})
-                  </h4>
-                  <div className="space-y-1.5">
-                    {scopedDataPayload.scoped_data.current_medications.map((m, idx) => (
-                      <div key={idx} className="p-2.5 bg-gray-50 border border-black rounded-xl flex justify-between">
-                        <div>
-                          <span className="font-bold text-[#0A0A0A]">{m.name}</span>
-                          <span className="text-[#555555] ml-2">{m.dosage} • {m.frequency}</span>
-                        </div>
-                        <span className="text-[10px] text-[#555555]">
-                          Dr. {m.prescribed_by || 'Unknown'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-between items-center pt-3 border-t border-black">
-              <span className="text-[11px] font-mono text-[#555555]">
-                Grant expires: {new Date(scopedDataPayload.expires_at).toLocaleString()}
-              </span>
-              <button
-                onClick={() => setViewDataModalOpen(false)}
-                className="px-4 py-2 bg-black text-white text-xs font-semibold rounded-xl hover:bg-[#333333]"
+                className="px-5 py-2 bg-black text-white text-xs font-bold rounded-xl hover:bg-[#333333] transition-colors"
               >
                 Close Data View
               </button>
@@ -928,3 +1028,4 @@ export default function OrgDashboard() {
     </div>
   );
 }
+

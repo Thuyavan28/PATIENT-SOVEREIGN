@@ -5,6 +5,7 @@ import { verifyToken, verifyUserPin } from '../middleware/auth.js';
 import { decryptPrivateKey, signData, verifySignature, hashContent } from '../lib/crypto.js';
 import { runFraudChecks, recordFraudFlags } from '../lib/fraud.js';
 import { logAuditEvent } from '../lib/auditLog.js';
+import { analyzeDrugSafety } from '../lib/ai.js';
 
 const router = Router();
 
@@ -315,18 +316,22 @@ router.post('/:id/approve', verifyToken(['patient']), async (req, res) => {
       accessReq.specific_document_ids
     );
 
-    // Update access_requests record
+    // CRITICAL FIX: store the EXACT string that was signed (not re-serialized)
+    // so verification can reconstruct it identically
+    const payloadStr = JSON.stringify(authorizationPayload);
+
+    // Update access_requests record — store payload as TEXT (not JSONB) to preserve exact string
     await query(
       `UPDATE access_requests SET
         status = 'approved',
-        authorization_payload = $1,
+        authorization_payload = $1::text,
         authorization_signature = $2,
         scoped_data = $3,
         approved_at = $4,
         expires_at = $5
        WHERE id = $6`,
       [
-        JSON.stringify(authorizationPayload),
+        payloadStr,
         authorizationSignature,
         JSON.stringify(scopedData),
         now.toISOString(),
@@ -489,11 +494,32 @@ router.post('/:id/revoke', verifyToken(['patient']), async (req, res) => {
 });
 
 /**
+ * GET /api/access-requests/org
+ * Auth: org_token — MUST be registered before /:id routes to avoid routing conflict
+ */
+router.get('/org', verifyToken(['org']), async (req, res) => {
+  try {
+    const reqRes = await query(
+      `SELECT r.*, u.name as patient_name
+       FROM access_requests r
+       JOIN users u ON r.patient_id = u.id
+       WHERE r.org_id = $1
+       ORDER BY r.created_at DESC`,
+      [req.user.id]
+    );
+    res.json(reqRes.rows);
+  } catch (err) {
+    console.error('Get org requests error:', err);
+    res.status(500).json({ error: 'Failed to retrieve org requests', message: err.message });
+  }
+});
+
+/**
  * GET /api/access-requests/:id/data
  * Auth: org_token
- * Crucial endpoint enforcing:
  * Final access = Authenticated org + Valid patient authorization
  *              + Valid RSA signature + Correct scope + Not expired + Not revoked
+ * + AI drug safety analysis of released prescriptions
  */
 router.get('/:id/data', verifyToken(['org']), async (req, res) => {
   try {
@@ -519,14 +545,13 @@ router.get('/:id/data', verifyToken(['org']), async (req, res) => {
       });
     }
 
-    // 2. Verify status is approved
+    // 2. Status checks
     if (accessReq.status === 'revoked') {
       return res.status(403).json({
         error: 'authorization_revoked',
         message: `Patient has revoked this authorization. Reason: ${accessReq.revoke_reason || 'No reason provided'}`
       });
     }
-
     if (accessReq.status !== 'approved') {
       return res.status(403).json({
         error: 'not_approved',
@@ -534,7 +559,7 @@ router.get('/:id/data', verifyToken(['org']), async (req, res) => {
       });
     }
 
-    // 3. Verify expiry
+    // 3. Expiry check
     const now = new Date();
     const expiresAt = new Date(accessReq.expires_at);
     if (expiresAt <= now) {
@@ -544,16 +569,23 @@ router.get('/:id/data', verifyToken(['org']), async (req, res) => {
       });
     }
 
-    // 4. Cryptographic verification of RSA-PSS signature
-    const payloadStr = typeof accessReq.authorization_payload === 'string'
-      ? accessReq.authorization_payload
-      : JSON.stringify(accessReq.authorization_payload);
+    // 4. RSA-PSS signature verification
+    // Use the stored string directly — it is the exact string that was signed
+    let payloadStr;
+    if (typeof accessReq.authorization_payload === 'string') {
+      // Stored as text column — use directly
+      payloadStr = accessReq.authorization_payload;
+    } else {
+      // Stored as JSONB (older records) — stringify with stable order
+      payloadStr = JSON.stringify(accessReq.authorization_payload);
+    }
 
-    const isSigValid = verifySignature(
-      payloadStr,
-      accessReq.authorization_signature,
-      accessReq.patient_public_key
-    );
+    let isSigValid = false;
+    try {
+      isSigValid = verifySignature(payloadStr, accessReq.authorization_signature, accessReq.patient_public_key);
+    } catch (sigErr) {
+      console.error('Signature verification error:', sigErr);
+    }
 
     if (!isSigValid) {
       await logAuditEvent({
@@ -564,14 +596,47 @@ router.get('/:id/data', verifyToken(['org']), async (req, res) => {
         targetType: 'access_request',
         metadata: { message: 'RSA signature verification failed during org data access' }
       });
-
       return res.status(403).json({
         error: 'tamper_detected',
         message: 'Cryptographic signature check failed. Authorization payload was altered or corrupted.'
       });
     }
 
-    // 5. Audit log access
+    // 5. Parse scoped data
+    const parsedScoped = typeof accessReq.scoped_data === 'string'
+      ? JSON.parse(accessReq.scoped_data)
+      : (accessReq.scoped_data || {});
+
+    // 6. AI Drug Safety Analysis on released prescriptions
+    let aiSafety = null;
+    try {
+      const drugs = [];
+      const allergies = parsedScoped.allergies || [];
+
+      // Collect all drug names from prescriptions
+      if (Array.isArray(parsedScoped.prescriptions)) {
+        parsedScoped.prescriptions.forEach(rx => {
+          if (rx.drug_name) drugs.push(rx.drug_name);
+        });
+      }
+      // Also include current medications
+      if (Array.isArray(parsedScoped.current_medications)) {
+        parsedScoped.current_medications.forEach(med => {
+          const name = typeof med === 'string' ? med : (med.name || med.drug_name || '');
+          if (name && !drugs.includes(name)) drugs.push(name);
+        });
+      }
+
+      if (drugs.length > 0) {
+        console.log('[AI Clinical] Analyzing drug safety for scoped data release:', { drugs, allergies });
+        aiSafety = await analyzeDrugSafety(drugs, allergies);
+      }
+    } catch (aiErr) {
+      console.warn('[AI Clinical] Drug safety check failed (non-critical):', aiErr.message);
+      aiSafety = null;
+    }
+
+    // 7. Audit log
     await logAuditEvent({
       actorId: req.user.id,
       actorRole: 'org',
@@ -580,13 +645,11 @@ router.get('/:id/data', verifyToken(['org']), async (req, res) => {
       targetType: 'access_request',
       metadata: {
         patient_id: accessReq.patient_id,
-        categories_accessed: accessReq.data_categories
+        categories_accessed: accessReq.data_categories,
+        ai_safety_checked: aiSafety !== null,
+        ai_safe: aiSafety?.safe ?? null
       }
     });
-
-    const parsedScoped = typeof accessReq.scoped_data === 'string'
-      ? JSON.parse(accessReq.scoped_data)
-      : accessReq.scoped_data;
 
     res.json({
       request_id: accessReq.id,
@@ -596,34 +659,12 @@ router.get('/:id/data', verifyToken(['org']), async (req, res) => {
       expires_at: accessReq.expires_at,
       data_categories: accessReq.data_categories,
       rsa_signature_verified: true,
-      scoped_data: parsedScoped
+      scoped_data: parsedScoped,
+      ai_safety: aiSafety
     });
   } catch (err) {
     console.error('Access data error:', err);
     res.status(500).json({ error: 'Failed to access patient data', message: err.message });
-  }
-});
-
-/**
- * GET /api/access-requests/org
- * Auth: org_token
- * Returns all requests made by this organization
- */
-router.get('/org', verifyToken(['org']), async (req, res) => {
-  try {
-    const reqRes = await query(
-      `SELECT r.*, u.name as patient_name
-       FROM access_requests r
-       JOIN users u ON r.patient_id = u.id
-       WHERE r.org_id = $1
-       ORDER BY r.created_at DESC`,
-      [req.user.id]
-    );
-
-    res.json(reqRes.rows);
-  } catch (err) {
-    console.error('Get org requests error:', err);
-    res.status(500).json({ error: 'Failed to retrieve org requests', message: err.message });
   }
 });
 
