@@ -7,6 +7,18 @@ import { analyzeDrugSafety } from '../lib/ai.js';
 
 const router = Router();
 
+function formatCanonicalDate(val) {
+  if (!val) return null;
+  if (typeof val === 'string') return val.split('T')[0];
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return String(val).split('T')[0];
+}
+
 // Helper to construct canonical prescription object for hashing
 export function buildPrescriptionCanonicalObj(rx, patientId) {
   return {
@@ -19,10 +31,11 @@ export function buildPrescriptionCanonicalObj(rx, patientId) {
     doctor_reg: rx.doctor_reg || null,
     diagnosis: rx.diagnosis || null,
     notes: rx.notes || null,
-    issued_date: rx.issued_date instanceof Date ? rx.issued_date.toISOString().split('T')[0] : String(rx.issued_date).split('T')[0],
-    expiry_date: rx.expiry_date ? (rx.expiry_date instanceof Date ? rx.expiry_date.toISOString().split('T')[0] : String(rx.expiry_date).split('T')[0]) : null
+    issued_date: formatCanonicalDate(rx.issued_date),
+    expiry_date: formatCanonicalDate(rx.expiry_date)
   };
 }
+
 
 /**
  * POST /api/prescriptions
