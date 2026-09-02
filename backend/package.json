@@ -1,0 +1,21 @@
+{
+  "name": "rxvault-backend",
+  "version": "1.0.0",
+  "description": "RxVault - Patient-Sovereign Health Data Exchange Platform Backend",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.2.14",
+    "@neondatabase/serverless": "^0.10.4",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1"
+  }
+}

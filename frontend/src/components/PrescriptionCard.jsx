@@ -1,0 +1,279 @@
+import React, { useState } from 'react';
+import {
+  RiCapsuleLine,
+  RiShieldCheckLine,
+  RiArrowDownSLine,
+  RiArrowUpSLine,
+  RiAlertLine,
+  RiCheckLine,
+  RiCloseLine,
+  RiErrorWarningLine
+} from 'react-icons/ri';
+import api from '../lib/api';
+import { toast } from '../lib/toast';
+
+export default function PrescriptionCard({ rx, onRefresh }) {
+  const [expandedChain, setExpandedChain] = useState(false);
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState(null);
+
+  const statusColors = {
+    active: 'bg-green-50 text-[#16A34A] border-green-200',
+    dispensed: 'bg-gray-100 text-[#555555] border-gray-300',
+    expired: 'bg-red-50 text-[#EF4444] border-red-200',
+    cancelled: 'bg-red-50 text-[#EF4444] border-red-200'
+  };
+
+  const aiWarnings = typeof rx.ai_warnings === 'string'
+    ? JSON.parse(rx.ai_warnings || '{}')
+    : (rx.ai_warnings || {});
+
+  const hasAiWarning = aiWarnings && aiWarnings.safe === false;
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    try {
+      const res = await api.get(`/prescriptions/${rx.id}/verify`);
+      setVerificationResult(res.data);
+      setVerifyModalOpen(true);
+    } catch (err) {
+      toast.error('Failed to verify prescription integrity');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  return (
+    <div className="bg-white border border-black rounded-2xl p-6 shadow-sm space-y-4 hover:border-black transition-colors font-sans">
+      {/* Top row */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-start space-x-3">
+          <div className="p-2.5 bg-gray-50 border border-[#D0D0D0] rounded-xl text-[#0A0A0A] mt-0.5">
+            <RiCapsuleLine className="text-xl" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="text-base font-medium font-sans text-[#0A0A0A]">
+                {rx.drug_name}
+              </h3>
+              <span className="text-xs font-sans font-medium bg-gray-100 px-2 py-0.5 rounded-lg text-[#0A0A0A]">
+                {rx.dosage}
+              </span>
+            </div>
+            <p className="text-xs font-normal font-sans text-[#555555] mt-0.5">
+              {rx.frequency} {rx.duration ? `• ${rx.duration}` : ''}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          {hasAiWarning && (
+            <span className="inline-flex items-center space-x-1 text-[11px] font-medium font-sans bg-amber-50 text-[#F59E0B] border border-amber-200 px-2.5 py-0.5 rounded-full">
+              <RiAlertLine className="text-xs" />
+              <span>Safety Warning</span>
+            </span>
+          )}
+
+          <span
+            className={`text-xs font-sans uppercase px-2.5 py-0.5 rounded-full border ${
+              statusColors[rx.status] || statusColors.active
+            }`}
+          >
+            {rx.status}
+          </span>
+        </div>
+      </div>
+
+      {/* Doctor & Prescription Details */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-gray-50/70 border border-gray-200/80 rounded-xl p-3 font-sans">
+        <div>
+          <span className="text-[#555555] block font-normal">Prescriber</span>
+          <span className="font-medium font-sans text-[#0A0A0A]">{rx.doctor_name}</span>
+          {rx.doctor_reg && (
+            <span className="text-[10px] text-[#555555] block font-mono">
+              Reg: {rx.doctor_reg}
+            </span>
+          )}
+        </div>
+        <div>
+          <span className="text-[#555555] block font-normal">Diagnosis</span>
+          <span className="font-medium font-sans text-[#0A0A0A]">{rx.diagnosis || '—'}</span>
+        </div>
+        <div>
+          <span className="text-[#555555] block font-normal">Issued Date</span>
+          <span className="font-medium font-sans text-[#0A0A0A]">
+            {new Date(rx.issued_date).toLocaleDateString()}
+          </span>
+        </div>
+        <div>
+          <span className="text-[#555555] block font-normal">Expiry Date</span>
+          <span className="font-medium font-sans text-[#0A0A0A]">
+            {rx.expiry_date ? new Date(rx.expiry_date).toLocaleDateString() : 'No expiry'}
+          </span>
+        </div>
+      </div>
+
+      {/* Notes if present */}
+      {rx.notes && (
+        <p className="text-xs font-normal font-sans text-[#555555] bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+          Notes: {rx.notes}
+        </p>
+      )}
+
+      {/* Action buttons & Expand Chain */}
+      <div className="pt-2 border-t border-gray-100 flex items-center justify-between font-sans">
+        <button
+          onClick={() => setExpandedChain(!expandedChain)}
+          className="flex items-center space-x-1 text-xs font-medium font-sans text-[#555555] hover:text-[#0A0A0A] transition-colors"
+        >
+          <span>Hash Chain Details</span>
+          {expandedChain ? (
+            <RiArrowUpSLine className="text-sm" />
+          ) : (
+            <RiArrowDownSLine className="text-sm" />
+          )}
+        </button>
+
+        <button
+          onClick={handleVerify}
+          disabled={verifying}
+          className="flex items-center space-x-1.5 px-3 py-1.5 border border-[#0A0A0A] text-[#0A0A0A] bg-white hover:bg-black hover:text-white rounded-xl text-xs font-medium font-sans transition-colors disabled:opacity-50"
+        >
+          <RiShieldCheckLine className="text-sm" />
+          <span>{verifying ? 'Verifying...' : 'Verify Integrity'}</span>
+        </button>
+      </div>
+
+      {/* Collapsible Hash Chain Block */}
+      {expandedChain && (
+        <div className="bg-gray-50 border border-[#D0D0D0] rounded-md p-3 text-xs font-mono space-y-1.5 animate-fadeSlideIn">
+          <div className="flex justify-between items-center text-[11px]">
+            <span className="text-[#555555]">Content Hash (SHA-256):</span>
+            <span className="text-[#0A0A0A] select-all truncate max-w-[240px]">
+              {rx.content_hash}
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-[11px]">
+            <span className="text-[#555555]">Previous Chain Hash:</span>
+            <span className="text-[#0A0A0A] select-all truncate max-w-[240px]">
+              {rx.prev_hash}
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-[11px]">
+            <span className="text-[#555555]">Block Chain Hash:</span>
+            <span className="font-bold text-[#0A0A0A] select-all truncate max-w-[240px]">
+              {rx.chain_hash}
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-[11px] pt-1 border-t border-gray-200">
+            <span className="text-[#555555]">RSA-PSS Signature:</span>
+            <span className="text-[#0A0A0A] select-all truncate max-w-[240px]">
+              {rx.signature?.slice(0, 32)}...
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Verification Results Modal */}
+      {verifyModalOpen && verificationResult && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-[#D0D0D0] rounded-xl shadow-2xl max-w-md w-full p-6 animate-fadeSlideIn">
+            <div className="flex items-center justify-between pb-3 border-b border-[#D0D0D0]">
+              <div className="flex items-center space-x-2">
+                <RiShieldCheckLine className="text-xl text-[#0A0A0A]" />
+                <h3 className="text-base font-semibold text-[#0A0A0A]">
+                  Prescription Cryptographic Verification
+                </h3>
+              </div>
+              <button
+                onClick={() => setVerifyModalOpen(false)}
+                className="text-[#555555] hover:text-[#0A0A0A]"
+              >
+                <RiCloseLine className="text-xl" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3">
+              <div className="text-xs text-[#555555]">
+                Verification executed directly against patient sovereign public key and stored hash chain:
+              </div>
+
+              {/* Hash Match */}
+              <div className="flex items-center justify-between p-3 rounded-md bg-gray-50 border border-[#D0D0D0]">
+                <span className="text-xs font-medium text-[#0A0A0A]">Canonical Content Hash Match</span>
+                {verificationResult.hash_match ? (
+                  <span className="flex items-center space-x-1 text-xs font-semibold text-[#16A34A]">
+                    <RiCheckLine className="text-base" />
+                    <span>Matched</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center space-x-1 text-xs font-semibold text-[#EF4444]">
+                    <RiCloseLine className="text-base" />
+                    <span>Mismatch (Tampered)</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Signature Valid */}
+              <div className="flex items-center justify-between p-3 rounded-md bg-gray-50 border border-[#D0D0D0]">
+                <span className="text-xs font-medium text-[#0A0A0A]">RSA-PSS Digital Signature</span>
+                {verificationResult.signature_valid ? (
+                  <span className="flex items-center space-x-1 text-xs font-semibold text-[#16A34A]">
+                    <RiCheckLine className="text-base" />
+                    <span>Valid</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center space-x-1 text-xs font-semibold text-[#EF4444]">
+                    <RiCloseLine className="text-base" />
+                    <span>Invalid Signature</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Chain Valid */}
+              <div className="flex items-center justify-between p-3 rounded-md bg-gray-50 border border-[#D0D0D0]">
+                <span className="text-xs font-medium text-[#0A0A0A]">Hash Chain Continuity</span>
+                {verificationResult.chain_valid ? (
+                  <span className="flex items-center space-x-1 text-xs font-semibold text-[#16A34A]">
+                    <RiCheckLine className="text-base" />
+                    <span>Intact</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center space-x-1 text-xs font-semibold text-[#EF4444]">
+                    <RiCloseLine className="text-base" />
+                    <span>Broken Chain</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Overall status */}
+              <div className="mt-4 pt-3 border-t border-gray-100 text-center">
+                {!verificationResult.tampered ? (
+                  <div className="text-sm font-semibold text-[#16A34A] flex items-center justify-center space-x-1.5">
+                    <RiCheckLine className="text-lg" />
+                    <span>Prescription Proven Authentic & Untampered</span>
+                  </div>
+                ) : (
+                  <div className="text-sm font-semibold text-[#EF4444] flex items-center justify-center space-x-1.5">
+                    <RiErrorWarningLine className="text-lg" />
+                    <span>Tamper Detected: Record Invalid</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-[#D0D0D0]">
+              <button
+                onClick={() => setVerifyModalOpen(false)}
+                className="px-4 py-2 bg-black text-white text-xs font-medium rounded-md hover:bg-[#333333]"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
