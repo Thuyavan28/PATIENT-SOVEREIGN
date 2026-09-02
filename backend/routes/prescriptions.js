@@ -290,7 +290,7 @@ router.delete('/:id', verifyToken(['patient']), async (req, res) => {
       [rx.id]
     );
     await query(
-      `DELETE FROM dispensation_events WHERE prescription_id = $1`,
+      `DELETE FROM fraud_flags WHERE prescription_id = $1`,
       [rx.id]
     );
     await query(

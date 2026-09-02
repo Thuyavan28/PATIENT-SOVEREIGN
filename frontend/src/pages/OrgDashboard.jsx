@@ -897,7 +897,9 @@ export default function OrgDashboard() {
                           ? <RiShieldCheckLine className="text-lg text-[#16A34A]" />
                           : <RiAlertLine className="text-lg text-[#EF4444]" />}
                         <span className="text-xs font-bold tracking-wide uppercase">AI Clinical Safety Analysis</span>
-                        <span className="text-[9px] font-mono text-[#555555] bg-white/60 px-1.5 py-0.5 rounded">OpenRouter · Mistral-7B</span>
+                        <span className="text-[9px] font-mono text-[#555555] bg-white/60 px-1.5 py-0.5 rounded">
+                          {ai.model ? `OpenRouter · ${ai.model}` : 'OpenRouter AI'}
+                        </span>
                       </div>
                       <span className={`text-[10px] font-mono font-black uppercase px-2.5 py-1 rounded-full border-2 bg-white ${levelColor}`}>
                         {riskLevel.toUpperCase()}
