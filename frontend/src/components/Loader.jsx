@@ -1,55 +1,88 @@
 import React from 'react';
-import { RiShieldCheckLine, RiLockLine } from 'react-icons/ri';
+import { RiShieldCheckLine } from 'react-icons/ri';
 
+/**
+ * Loader — matches RxVault theme: white bg, black borders, Inter font
+ * 
+ * Props:
+ *   message    - primary loading text
+ *   subtitle   - secondary label
+ *   fullScreen - covers entire viewport (fixed inset-0)
+ */
 export default function Loader({
-  message = 'Verifying Cryptographic Ledger...',
-  subtitle = 'RxVault Zero-Trust Protocol',
+  message = 'Loading...',
+  subtitle = 'Please wait',
   fullScreen = false
 }) {
   const content = (
-    <div className="flex flex-col items-center justify-center p-8 text-center font-sans animate-fadeSlideIn">
-      {/* Animated Cryptographic Emblem */}
-      <div className="relative flex items-center justify-center w-20 h-20 mb-4">
-        {/* Outer Pulsing Ring */}
-        <div className="absolute inset-0 rounded-full border-2 border-black/20 animate-ping" />
-        
-        {/* Spinning Dotted Ring */}
-        <div className="absolute inset-0 rounded-full border-2 border-dashed border-black animate-spin [animation-duration:3s]" />
-        
-        {/* Center Shield Box */}
-        <div className="w-12 h-12 rounded-xl bg-black text-white flex items-center justify-center shadow-md relative z-10">
-          <RiShieldCheckLine className="text-2xl animate-pulse" />
-        </div>
+    <div className="flex flex-col items-center justify-center space-y-5 p-10 text-center font-sans">
+
+      {/* ── Animated Icon Stack ── */}
+      <div className="relative flex items-center justify-center w-[72px] h-[72px]">
+
+        {/* Outer slow-spin dashed ring */}
+        <span
+          className="absolute inset-0 rounded-full border border-dashed border-black/30"
+          style={{ animation: 'rxSpin 4s linear infinite' }}
+        />
+
+        {/* Middle faster spin ring */}
+        <span
+          className="absolute inset-[8px] rounded-full border border-black/20"
+          style={{ animation: 'rxSpin 2s linear infinite reverse' }}
+        />
+
+        {/* Inner ping pulse ring */}
+        <span className="absolute inset-[18px] rounded-full border border-black/10 animate-ping" />
+
+        {/* Center shield — static anchor */}
+        <span className="relative z-10 flex items-center justify-center w-9 h-9 rounded-xl bg-[#0A0A0A] text-white shadow">
+          <RiShieldCheckLine className="text-lg" />
+        </span>
       </div>
 
-      {/* Primary Message: Inter Bold 700 */}
-      <h3 className="text-base font-bold font-sans text-[#0A0A0A] tracking-tight">
-        {message}
-      </h3>
-
-      {/* Subtitle: Inter Regular 400 */}
-      <p className="text-xs font-normal font-sans text-[#555555] mt-1 max-w-xs">
-        {subtitle}
-      </p>
-
-      {/* Live crypto security badge */}
-      <div className="mt-4 flex items-center space-x-1.5 px-3 py-1 bg-gray-50 border border-black rounded-full text-[10px] font-mono text-[#0A0A0A]">
-        <RiLockLine className="text-xs" />
-        <span>SHA-256 • RSA-2048 • ZERO-TRUST</span>
+      {/* ── Bouncing dots progress bar ── */}
+      <div className="flex items-center space-x-1.5">
+        {[0, 1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className="w-1.5 h-1.5 rounded-full bg-[#0A0A0A]"
+            style={{
+              animation: `rxBounce 1.2s ease-in-out ${i * 0.15}s infinite`
+            }}
+          />
+        ))}
       </div>
+
+      {/* ── Text ── */}
+      <div className="space-y-1">
+        <p className="text-sm font-bold text-[#0A0A0A] tracking-tight leading-snug">
+          {message}
+        </p>
+        <p className="text-[11px] font-normal text-[#777777]">
+          {subtitle}
+        </p>
+      </div>
+
+      {/* ── Badge ── */}
+      <div className="flex items-center space-x-1.5 px-3 py-1 bg-white border border-black rounded-full text-[10px] font-mono text-[#0A0A0A]">
+        <span className="w-1.5 h-1.5 rounded-full bg-black inline-block animate-pulse" />
+        <span>RSA-2048 · ZERO-TRUST · SHA-256</span>
+      </div>
+
     </div>
   );
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-white z-[9999] flex items-center justify-center">
         {content}
       </div>
     );
   }
 
   return (
-    <div className="w-full flex items-center justify-center py-12">
+    <div className="w-full flex items-center justify-center min-h-[280px]">
       {content}
     </div>
   );
