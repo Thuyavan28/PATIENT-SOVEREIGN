@@ -23,16 +23,24 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // If unauthorized, clear invalid token and redirect if not on login/register
+    const status = error.response?.status;
+    const errData = error.response?.data;
+
+    if (status === 401) {
+      // Invalid/expired token — clear session
       if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
         localStorage.removeItem('rxvault_token');
         localStorage.removeItem('rxvault_user');
         window.location.href = '/login';
       }
+    } else if (status === 403) {
+      // Role mismatch — don't redirect, just surface the error
+      // The toast will be shown by the calling code via err.response
+      console.warn('[RxVault] 403 Forbidden:', errData?.message || errData?.error || 'Access denied');
     }
     return Promise.reject(error);
   }
 );
+
 
 export default api;
