@@ -20,7 +20,15 @@ if (databaseUrl && databaseUrl.length > 0) {
     connectionString: databaseUrl,
     ssl: databaseUrl.includes('neon.tech') || databaseUrl.includes('sslmode=require')
       ? { rejectUnauthorized: false }
-      : undefined
+      : undefined,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    allowExitOnIdle: false
+  });
+  // Reconnect on pool errors instead of crashing
+  pool.on('error', (err) => {
+    console.error('[DB] Pool error (will reconnect automatically):', err.message);
   });
 } else {
   console.log('DATABASE_URL not provided. Using local embedded PostgreSQL (PGlite)');
@@ -44,11 +52,26 @@ export async function query(text, params = []) {
       rowCount: res.affectedRows !== undefined ? res.affectedRows : (res.rows?.length || 0)
     };
   } else {
-    const res = await pool.query(text, params);
-    return {
-      rows: res.rows || [],
-      rowCount: res.rowCount || 0
-    };
+    // Retry once on transient connection errors (common with Neon serverless)
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const res = await pool.query(text, params);
+        return {
+          rows: res.rows || [],
+          rowCount: res.rowCount || 0
+        };
+      } catch (err) {
+        const isTransient = err.code === 'ECONNRESET' || err.code === 'ENOTFOUND' ||
+          err.message?.includes('Connection terminated') ||
+          err.message?.includes('connection refused');
+        if (isTransient && attempt === 1) {
+          console.warn(`[DB] Transient error on attempt ${attempt}, retrying in 500ms...`, err.message);
+          await new Promise(r => setTimeout(r, 500));
+        } else {
+          throw err;
+        }
+      }
+    }
   }
 }
 

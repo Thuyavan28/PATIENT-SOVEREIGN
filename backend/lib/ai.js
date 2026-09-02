@@ -238,8 +238,8 @@ Respond ONLY with valid JSON (no markdown, no explanation):
 
   if (keys.length > 0 && drugNames.length > 0) {
     const candidateModels = [
-      'minimax/minimax-m2.7:free',
-      'google/gemma-4-26b-a4b-it:free'
+      'liquid/lfm-2.5-2.6b:free',
+      'minimax/minimax-m2.7:free'
     ];
 
     for (let attempt = 0; attempt < Math.min(keys.length, 2); attempt++) {
@@ -251,7 +251,7 @@ Respond ONLY with valid JSON (no markdown, no explanation):
           console.log(`[AI Clinical] Fast clinical analysis via OpenRouter (${modelId}) key #${keyIdx + 1}...`);
           const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
-            signal: AbortSignal.timeout(4000),
+            signal: AbortSignal.timeout(7000),
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${apiKey}`,
