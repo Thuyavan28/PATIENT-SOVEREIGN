@@ -16,7 +16,7 @@ export default function TopBar({ breadcrumb = 'Overview' }) {
     : 'RX';
 
   return (
-    <header className="h-16 ml-[240px] bg-white border-b border-black px-8 flex items-center justify-between sticky top-0 z-20">
+    <header className="h-16 fixed top-0 left-[240px] right-0 bg-white border-b border-black px-8 flex items-center justify-between z-20">
       {/* Top Left: Main Application Brand */}
       <div className="flex items-center space-x-3">
         <h1 className="text-base font-bold tracking-tight text-[#0A0A0A]">

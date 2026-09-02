@@ -45,6 +45,7 @@ export default function OrgDashboard() {
   const [requests, setRequests] = useState([]);
   const [fraudFlags, setFraudFlags] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   // Find Patient State
   const [shareCodeInput, setShareCodeInput] = useState('');
@@ -67,15 +68,19 @@ export default function OrgDashboard() {
   const [loadingData, setLoadingData] = useState(false);
 
   const loadOrgData = async () => {
+    setLoadError(null);
     try {
-      const [reqRes, flagRes] = await Promise.all([
-        api.get('/access-requests/org'),
-        api.get('/admin/fraud-flags')
-      ]);
+      // Only fetch org-scoped data — orgs cannot call /admin endpoints
+      const reqRes = await api.get('/access-requests/org');
       setRequests(reqRes.data);
-      setFraudFlags(flagRes.data);
+      setFraudFlags([]); // Fraud flags for orgs: derived from access request flags_triggered
     } catch (err) {
       console.error('Failed to load org data:', err);
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setLoadError('Session expired or access denied. Please log in again.');
+      } else {
+        setLoadError('Failed to connect to backend. Please ensure the server is running.');
+      }
     } finally {
       setLoading(false);
     }
@@ -189,12 +194,51 @@ export default function OrgDashboard() {
     { id: 'chronic_conditions', label: 'Chronic Conditions', icon: RiDnaLine }
   ];
 
+  // Loading screen
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Sidebar currentTab={tab} setTab={setTab} />
+        <TopBar breadcrumb={tab} />
+        <main className="ml-[240px] pt-16 flex items-center justify-center min-h-screen">
+          <Loader
+            message="Loading Organization Portal..."
+            subtitle="Fetching authorized patient grants and request ledger"
+          />
+        </main>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Sidebar currentTab={tab} setTab={setTab} />
+        <TopBar breadcrumb={tab} />
+        <main className="ml-[240px] pt-16 flex items-center justify-center min-h-screen">
+          <div className="max-w-md text-center space-y-4 p-8 bg-white border border-black rounded-2xl">
+            <RiAlertLine className="text-4xl text-[#EF4444] mx-auto" />
+            <h2 className="text-base font-bold text-[#0A0A0A]">Connection Error</h2>
+            <p className="text-xs text-[#555555]">{loadError}</p>
+            <button
+              onClick={() => { setLoading(true); loadOrgData(); }}
+              className="flex items-center space-x-2 mx-auto px-4 py-2 bg-black text-white rounded-xl text-xs font-medium hover:bg-[#333333] transition-colors"
+            >
+              <RiShieldCheckLine className="text-sm" />
+              <span>Retry Connection</span>
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FFFFFF]">
       <Sidebar currentTab={tab} setTab={setTab} />
       <TopBar breadcrumb={tab} />
 
-      <main className="ml-[240px] p-8 max-w-[1200px] space-y-6">
+      <main className="ml-[240px] pt-16 px-8 pb-8 max-w-[1200px] space-y-6">
 
         {/* Unverified Org Alert Banner */}
         {!user.org_verified && (

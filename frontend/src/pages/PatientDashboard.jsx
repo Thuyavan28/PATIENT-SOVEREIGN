@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../lib/auth';
 import api from '../lib/api';
 import { toast } from '../lib/toast';
@@ -24,7 +24,8 @@ import {
   RiHeartPulseLine,
   RiScissorsCutLine,
   RiDnaLine,
-  RiShieldLine
+  RiShieldLine,
+  RiRefreshLine
 } from 'react-icons/ri';
 
 // Components
@@ -40,6 +41,7 @@ import AuditTable from '../components/AuditTable';
 import CryptoProcessPopup from '../components/CryptoProcessPopup';
 import PinInput from '../components/PinInput';
 import DrugWarningBanner from '../components/DrugWarningBanner';
+import Loader from '../components/Loader';
 
 export default function PatientDashboard() {
   const { user } = useAuth();
@@ -53,6 +55,11 @@ export default function PatientDashboard() {
   const [requestHistory, setRequestHistory] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [rxLoading, setRxLoading] = useState(false);
+  const [docLoading, setDocLoading] = useState(false);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [vaultLoading, setVaultLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,7 +112,8 @@ export default function PatientDashboard() {
   const [changePinLoading, setChangePinLoading] = useState(false);
 
   // Load all patient data
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    setLoadError(null);
     try {
       const [vRes, rxRes, docRes, pendRes, histRes, audRes] = await Promise.all([
         api.get('/vault'),
@@ -125,10 +133,11 @@ export default function PatientDashboard() {
       setAuditLogs(audRes.data);
     } catch (err) {
       console.error('Failed to load patient dashboard data:', err);
+      setLoadError('Failed to connect to RxVault backend. Please check that the backend server is running on port 3001.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -388,12 +397,52 @@ export default function PatientDashboard() {
     );
   });
 
+  // Full-screen loader while initial data is being fetched
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Sidebar currentTab={tab} setTab={setTab} pendingCount={0} />
+        <TopBar breadcrumb={tab} />
+        <main className="ml-[240px] pt-16 flex items-center justify-center min-h-screen">
+          <Loader
+            message="Loading Your Sovereign Health Vault..."
+            subtitle="Decrypting encrypted ledger data from Neon Cloud Database"
+          />
+        </main>
+      </div>
+    );
+  }
+
+  // Error state
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Sidebar currentTab={tab} setTab={setTab} pendingCount={0} />
+        <TopBar breadcrumb={tab} />
+        <main className="ml-[240px] pt-16 flex items-center justify-center min-h-screen">
+          <div className="max-w-md text-center space-y-4 p-8 bg-white border border-black rounded-2xl">
+            <RiAlertLine className="text-4xl text-[#EF4444] mx-auto" />
+            <h2 className="text-base font-bold text-[#0A0A0A]">Backend Connection Failed</h2>
+            <p className="text-xs text-[#555555]">{loadError}</p>
+            <button
+              onClick={() => { setLoading(true); loadData(); }}
+              className="flex items-center space-x-2 mx-auto px-4 py-2 bg-black text-white rounded-xl text-xs font-medium hover:bg-[#333333] transition-colors"
+            >
+              <RiRefreshLine className="text-sm" />
+              <span>Retry Connection</span>
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FFFFFF]">
       <Sidebar currentTab={tab} setTab={setTab} pendingCount={pendingRequests.length} />
       <TopBar breadcrumb={tab} />
 
-      <main className="ml-[240px] p-8 max-w-[1200px] space-y-6">
+      <main className="ml-[240px] pt-16 px-8 pb-8 max-w-[1200px] space-y-6">
 
         {/* TAB 1: OVERVIEW / DASHBOARD */}
         {tab === 'overview' && (

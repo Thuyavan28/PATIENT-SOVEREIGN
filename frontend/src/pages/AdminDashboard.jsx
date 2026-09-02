@@ -23,6 +23,7 @@ import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import StatsCard from '../components/StatsCard';
 import AuditTable from '../components/AuditTable';
+import Loader from '../components/Loader';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -53,6 +54,7 @@ export default function AdminDashboard() {
       setFraudFlags(flagsRes.data || []);
     } catch (err) {
       console.error('Failed to load admin data:', err);
+      toast.error('Failed to load admin dashboard data');
     } finally {
       setLoading(false);
     }
@@ -78,12 +80,27 @@ export default function AdminDashboard() {
     return true;
   });
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Sidebar currentTab={tab} setTab={setTab} />
+        <TopBar breadcrumb={tab} />
+        <main className="ml-[240px] pt-16 flex items-center justify-center min-h-screen">
+          <Loader
+            message="Loading System Administration Panel..."
+            subtitle="Fetching organization verification states, fraud flags, and audit ledger"
+          />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FFFFFF]">
       <Sidebar currentTab={tab} setTab={setTab} />
       <TopBar breadcrumb={tab} />
 
-      <main className="ml-[240px] p-8 max-w-[1200px] space-y-6">
+      <main className="ml-[240px] pt-16 px-8 pb-8 max-w-[1200px] space-y-6">
 
         {/* TAB 1: OVERVIEW */}
         {tab === 'overview' && stats && (
