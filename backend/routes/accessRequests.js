@@ -324,7 +324,7 @@ router.post('/:id/approve', verifyToken(['patient']), async (req, res) => {
     await query(
       `UPDATE access_requests SET
         status = 'approved',
-        authorization_payload = $1::text,
+        authorization_payload = $1,
         authorization_signature = $2,
         scoped_data = $3,
         approved_at = $4,

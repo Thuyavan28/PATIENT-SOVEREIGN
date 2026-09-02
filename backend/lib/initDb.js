@@ -103,7 +103,7 @@ export async function initDatabase() {
       purpose_notes TEXT,
       duration_hours INTEGER NOT NULL DEFAULT 24,
       status TEXT DEFAULT 'pending',
-      authorization_payload JSONB,
+      authorization_payload TEXT,
       authorization_signature TEXT,
       scoped_data JSONB,
       approved_at TIMESTAMPTZ,
