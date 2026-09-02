@@ -868,72 +868,174 @@ export default function OrgDashboard() {
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 text-xs">
 
-              {/* AI Drug Safety Panel */}
-              {scopedDataPayload.ai_safety && (
-                <div className={`p-4 rounded-xl border space-y-3 ${
-                  scopedDataPayload.ai_safety.safe
-                    ? 'bg-green-50 border-[#16A34A]'
-                    : 'bg-red-50 border-[#EF4444]'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <RiShieldCheckLine className={`text-base ${scopedDataPayload.ai_safety.safe ? 'text-[#16A34A]' : 'text-[#EF4444]'}`} />
-                      <span className={`text-xs font-bold ${scopedDataPayload.ai_safety.safe ? 'text-[#16A34A]' : 'text-[#EF4444]'}`}>
-                        AI Clinical Safety Analysis
+              {/* ─── AI Clinical Safety Analysis Panel ─── */}
+              {scopedDataPayload.ai_safety && (() => {
+                const ai = scopedDataPayload.ai_safety;
+                const riskScore = ai.risk_score ?? 0;
+                const riskLevel = ai.risk_level || (ai.safe ? 'safe' : 'high');
+                const isCritical = riskLevel === 'critical';
+                const isHigh     = riskLevel === 'high';
+                const isModerate = riskLevel === 'moderate';
+                const isSafe     = riskLevel === 'safe' || ai.safe;
+
+                const levelColor = isCritical ? 'text-red-700 bg-red-50 border-red-500'
+                  : isHigh     ? 'text-[#EF4444] bg-red-50 border-[#EF4444]'
+                  : isModerate ? 'text-amber-700 bg-amber-50 border-amber-400'
+                  : 'text-[#16A34A] bg-green-50 border-[#16A34A]';
+
+                const gaugeColor = isCritical || isHigh ? '#EF4444'
+                  : isModerate ? '#F59E0B'
+                  : '#16A34A';
+
+                return (
+                  <div className={`rounded-xl border-2 overflow-hidden ${levelColor}`}>
+
+                    {/* Header */}
+                    <div className={`px-4 py-3 flex items-center justify-between border-b ${levelColor}`}>
+                      <div className="flex items-center space-x-2">
+                        {isSafe
+                          ? <RiShieldCheckLine className="text-lg text-[#16A34A]" />
+                          : <RiAlertLine className="text-lg text-[#EF4444]" />}
+                        <span className="text-xs font-bold tracking-wide uppercase">AI Clinical Safety Analysis</span>
+                        <span className="text-[9px] font-mono text-[#555555] bg-white/60 px-1.5 py-0.5 rounded">OpenRouter · Mistral-7B</span>
+                      </div>
+                      <span className={`text-[10px] font-mono font-black uppercase px-2.5 py-1 rounded-full border-2 bg-white ${levelColor}`}>
+                        {riskLevel.toUpperCase()}
                       </span>
                     </div>
-                    <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full border ${
-                      scopedDataPayload.ai_safety.safe
-                        ? 'bg-white text-[#16A34A] border-[#16A34A]'
-                        : 'bg-white text-[#EF4444] border-[#EF4444]'
-                    }`}>
-                      {scopedDataPayload.ai_safety.safe ? '✓ No Critical Interactions' : '⚠ Interactions Detected'}
-                    </span>
+
+                    <div className="p-4 space-y-4 bg-white/70">
+
+                      {/* Risk Score Gauge */}
+                      <div className="flex items-center space-x-4">
+                        <div className="relative w-16 h-16 shrink-0">
+                          <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                            <circle cx="32" cy="32" r="26" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                            <circle
+                              cx="32" cy="32" r="26" fill="none"
+                              stroke={gaugeColor} strokeWidth="8"
+                              strokeDasharray={`${(riskScore / 100) * 163.4} 163.4`}
+                              strokeLinecap="round"
+                              style={{ transition: 'stroke-dasharray 1s ease' }}
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-sm font-black text-[#0A0A0A]">{riskScore}</span>
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-bold text-[#0A0A0A] mb-0.5">Risk Score: {riskScore}/100</p>
+                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-700"
+                              style={{ width: `${riskScore}%`, backgroundColor: gaugeColor }}
+                            />
+                          </div>
+                          <p className="text-[11px] text-[#555555] mt-1.5 leading-relaxed">{ai.summary || 'Analysis complete.'}</p>
+                        </div>
+                      </div>
+
+                      {/* CRITICAL: Toxic Doses */}
+                      {ai.toxic_doses?.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-red-700 flex items-center space-x-1">
+                            <RiAlertLine className="text-sm" /><span>⚠ Toxic / Lethal Dosage Detected</span>
+                          </p>
+                          {ai.toxic_doses.map((td, i) => (
+                            <div key={i} className="p-3 bg-red-50 border-2 border-red-500 rounded-xl animate-pulse-slow">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-black text-red-700 text-sm">{td.drug}</span>
+                                <span className="text-[10px] font-mono font-black uppercase bg-red-600 text-white px-2 py-0.5 rounded-full">
+                                  CRITICAL — DO NOT DISPENSE
+                                </span>
+                              </div>
+                              <p className="text-xs text-red-700">
+                                Prescribed: <strong>{td.prescribed_dose}</strong>
+                                {td.max_safe_dose && <> · Safe max: <strong>{td.max_safe_dose}</strong></>}
+                              </p>
+                              <p className="text-xs text-red-600 mt-1 leading-relaxed">{td.reason}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Drug-Drug Interactions */}
+                      {ai.interactions?.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#555555]">Drug-Drug Interactions</p>
+                          {ai.interactions.map((intx, i) => (
+                            <div key={i} className="p-2.5 bg-white border border-black rounded-xl">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold text-[#0A0A0A]">{intx.drugs?.join(' + ')}</span>
+                                <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full ${
+                                  intx.severity === 'high'   ? 'bg-red-100 text-[#EF4444]' :
+                                  intx.severity === 'medium' ? 'bg-amber-100 text-[#F59E0B]' :
+                                  'bg-gray-100 text-[#555555]'
+                                }`}>{intx.severity}</span>
+                              </div>
+                              <p className="text-[#555555] leading-relaxed">{intx.reason}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Allergy Conflicts */}
+                      {ai.allergy_conflicts?.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#555555]">Allergy Conflicts</p>
+                          {ai.allergy_conflicts.map((ac, i) => (
+                            <div key={i} className="p-2.5 bg-red-50 border border-[#EF4444] rounded-xl">
+                              <div className="flex items-center space-x-2 mb-1 flex-wrap gap-1">
+                                <RiAlertLine className="text-[#EF4444] text-sm shrink-0" />
+                                <span className="font-bold text-[#0A0A0A]">{ac.drug}</span>
+                                <span className="text-[#555555]">conflicts with allergy to</span>
+                                <span className="font-bold text-[#EF4444]">{ac.allergy}</span>
+                              </div>
+                              <p className="text-[#555555] leading-relaxed">{ac.reason}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Contraindications */}
+                      {ai.contraindications?.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#555555]">Drug-Condition Contraindications</p>
+                          {ai.contraindications.map((ci, i) => (
+                            <div key={i} className="p-2.5 bg-amber-50 border border-amber-400 rounded-xl">
+                              <p className="font-bold text-[#0A0A0A] mb-0.5">{ci.drug} + {ci.condition}</p>
+                              <p className="text-[#555555] leading-relaxed">{ci.reason}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Recommendations */}
+                      {ai.recommendations?.length > 0 && (
+                        <div className="p-3 bg-[#0A0A0A] rounded-xl space-y-1.5">
+                          <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-white/60">Pharmacist Recommendations</p>
+                          {ai.recommendations.map((rec, i) => (
+                            <div key={i} className="flex items-start space-x-2">
+                              <span className="text-white mt-0.5 shrink-0">→</span>
+                              <p className="text-xs text-white leading-relaxed">{rec}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Safe message */}
+                      {isSafe && ai.toxic_doses?.length === 0 && (
+                        <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-xl border border-[#16A34A]">
+                          <RiShieldCheckLine className="text-[#16A34A] text-base shrink-0" />
+                          <p className="text-xs text-[#16A34A] font-medium">No critical safety concerns detected. Prescription set appears safe to dispense.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                );
+              })()}
 
-                  {/* Interactions */}
-                  {scopedDataPayload.ai_safety.interactions?.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#555555]">Drug-Drug Interactions</p>
-                      {scopedDataPayload.ai_safety.interactions.map((intx, i) => (
-                        <div key={i} className="p-2.5 bg-white border border-black rounded-lg">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold text-[#0A0A0A]">{intx.drugs?.join(' + ')}</span>
-                            <span className={`text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded ${
-                              intx.severity === 'high' ? 'bg-red-100 text-[#EF4444]' :
-                              intx.severity === 'medium' ? 'bg-amber-100 text-[#F59E0B]' :
-                              'bg-gray-100 text-[#555555]'
-                            }`}>{intx.severity}</span>
-                          </div>
-                          <p className="text-[#555555] leading-relaxed">{intx.reason}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
-                  {/* Allergy conflicts */}
-                  {scopedDataPayload.ai_safety.allergy_conflicts?.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#555555]">Allergy Conflicts</p>
-                      {scopedDataPayload.ai_safety.allergy_conflicts.map((ac, i) => (
-                        <div key={i} className="p-2.5 bg-white border border-[#EF4444] rounded-lg">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <RiAlertLine className="text-[#EF4444] text-sm shrink-0" />
-                            <span className="font-bold text-[#0A0A0A]">{ac.drug}</span>
-                            <span className="text-[#555555]">conflicts with allergy to</span>
-                            <span className="font-bold text-[#EF4444]">{ac.allergy}</span>
-                          </div>
-                          <p className="text-[#555555] leading-relaxed">{ac.reason}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {scopedDataPayload.ai_safety.safe && (
-                    <p className="text-xs text-[#16A34A]">No critical drug-drug interactions or allergy conflicts detected in this prescription set.</p>
-                  )}
-                </div>
-              )}
 
               {/* Patient Profile */}
               {scopedDataPayload.scoped_data?.patient_profile && (

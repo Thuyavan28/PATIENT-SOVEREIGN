@@ -5,7 +5,8 @@ import { verifyToken, verifyUserPin } from '../middleware/auth.js';
 import { decryptPrivateKey, signData, verifySignature, hashContent } from '../lib/crypto.js';
 import { runFraudChecks, recordFraudFlags } from '../lib/fraud.js';
 import { logAuditEvent } from '../lib/auditLog.js';
-import { analyzeDrugSafety } from '../lib/ai.js';
+import { analyzeScopedDataSafety } from '../lib/ai.js';
+
 
 const router = Router();
 
@@ -607,34 +608,17 @@ router.get('/:id/data', verifyToken(['org']), async (req, res) => {
       ? JSON.parse(accessReq.scoped_data)
       : (accessReq.scoped_data || {});
 
-    // 6. AI Drug Safety Analysis on released prescriptions
+    // 6. AI Full Clinical Safety Analysis on the exact scoped data released
     let aiSafety = null;
     try {
-      const drugs = [];
-      const allergies = parsedScoped.allergies || [];
-
-      // Collect all drug names from prescriptions
-      if (Array.isArray(parsedScoped.prescriptions)) {
-        parsedScoped.prescriptions.forEach(rx => {
-          if (rx.drug_name) drugs.push(rx.drug_name);
-        });
-      }
-      // Also include current medications
-      if (Array.isArray(parsedScoped.current_medications)) {
-        parsedScoped.current_medications.forEach(med => {
-          const name = typeof med === 'string' ? med : (med.name || med.drug_name || '');
-          if (name && !drugs.includes(name)) drugs.push(name);
-        });
-      }
-
-      if (drugs.length > 0) {
-        console.log('[AI Clinical] Analyzing drug safety for scoped data release:', { drugs, allergies });
-        aiSafety = await analyzeDrugSafety(drugs, allergies);
-      }
+      // Pass full scoped data — AI only sees what org sees, never full patient PII
+      aiSafety = await analyzeScopedDataSafety(parsedScoped);
+      console.log(`[AI Clinical] Risk score: ${aiSafety?.risk_score} (${aiSafety?.risk_level}). Safe: ${aiSafety?.safe}`);
     } catch (aiErr) {
       console.warn('[AI Clinical] Drug safety check failed (non-critical):', aiErr.message);
       aiSafety = null;
     }
+
 
     // 7. Audit log
     await logAuditEvent({
