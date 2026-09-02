@@ -17,14 +17,18 @@ export default function TopBar({ breadcrumb = 'Overview' }) {
 
   return (
     <header className="h-16 fixed top-0 left-[240px] right-0 bg-white border-b border-black px-8 flex items-center justify-between z-20">
-      {/* Top Left: Main Application Brand */}
-      <div className="flex items-center space-x-3">
-        <h1 className="text-base font-bold tracking-tight text-[#0A0A0A]">
-          RxVault Platform
-        </h1>
+      {/* Top Left: Context Breadcrumb */}
+      <div className="flex items-center space-x-2 text-xs font-sans">
+        <span className="font-semibold text-[#0A0A0A]">
+          {user.role === 'org' ? 'Organization Portal' : user.role === 'admin' ? 'Admin Portal' : 'Patient Portal'}
+        </span>
+        <span className="text-gray-300">/</span>
+        <span className="text-[#555555] capitalize font-medium">
+          {breadcrumb === 'overview' ? 'Overview' : breadcrumb.replace(/-/g, ' ')}
+        </span>
         {user.share_code && (
-          <span className="hidden sm:inline-block px-2.5 py-0.5 bg-gray-50 border border-black rounded-full text-[11px] font-mono font-medium text-[#0A0A0A]">
-            Code: {user.share_code}
+          <span className="ml-3 hidden sm:inline-block px-2.5 py-0.5 bg-gray-50 border border-black rounded-full text-[11px] font-mono font-medium text-[#0A0A0A]">
+            Share Code: {user.share_code}
           </span>
         )}
       </div>

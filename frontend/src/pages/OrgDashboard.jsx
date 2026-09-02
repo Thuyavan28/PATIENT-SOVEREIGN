@@ -240,7 +240,7 @@ export default function OrgDashboard() {
       <Sidebar currentTab={tab} setTab={setTab} />
       <TopBar breadcrumb={tab} />
 
-      <main className="ml-[240px] pt-16 px-8 pb-8 max-w-[1200px] space-y-6">
+      <main className="ml-[240px] pt-24 px-8 pb-16 max-w-[1300px] space-y-8">
 
         {/* Unverified Org Alert Banner */}
         {!user.org_verified && (
@@ -274,7 +274,7 @@ export default function OrgDashboard() {
                 className="flex items-center space-x-1.5 border border-[#0A0A0A] bg-white text-[#0A0A0A] hover:bg-[#0A0A0A] hover:text-white px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
               >
                 <RiAddLine className="text-sm" />
-                <span>+ Request Patient Access</span>
+                <span>Request Patient Access</span>
               </button>
             </div>
 

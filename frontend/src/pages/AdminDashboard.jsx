@@ -100,7 +100,7 @@ export default function AdminDashboard() {
       <Sidebar currentTab={tab} setTab={setTab} />
       <TopBar breadcrumb={tab} />
 
-      <main className="ml-[240px] pt-16 px-8 pb-8 max-w-[1200px] space-y-6">
+      <main className="ml-[240px] pt-24 px-8 pb-16 max-w-[1300px] space-y-8">
 
         {/* TAB 1: OVERVIEW */}
         {tab === 'overview' && stats && (

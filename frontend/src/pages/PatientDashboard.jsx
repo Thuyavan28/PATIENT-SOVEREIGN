@@ -450,7 +450,7 @@ export default function PatientDashboard() {
       <Sidebar currentTab={tab} setTab={setTab} pendingCount={pendingRequests.length} />
       <TopBar breadcrumb={tab} />
 
-      <main className="ml-[240px] pt-16 px-8 pb-8 max-w-[1200px] space-y-6">
+      <main className="ml-[240px] pt-24 px-8 pb-16 max-w-[1300px] space-y-8">
 
         {/* TAB 1: OVERVIEW / DASHBOARD */}
         {tab === 'overview' && (
@@ -470,7 +470,7 @@ export default function PatientDashboard() {
                 className="flex items-center space-x-1.5 border border-[#0A0A0A] bg-white text-[#0A0A0A] hover:bg-[#0A0A0A] hover:text-white px-4 py-2 rounded-xl text-xs font-medium font-sans transition-colors"
               >
                 <RiAddLine className="text-sm" />
-                <span>+ Add Prescription</span>
+                <span>Add Prescription</span>
               </button>
             </div>
 
@@ -844,7 +844,7 @@ export default function PatientDashboard() {
                 className="flex items-center space-x-1.5 border border-[#0A0A0A] bg-white text-[#0A0A0A] hover:bg-[#0A0A0A] hover:text-white px-4 py-2 rounded-xl text-xs font-medium font-sans transition-colors"
               >
                 <RiAddLine className="text-sm" />
-                <span>+ Add Prescription</span>
+                <span>Add Prescription</span>
               </button>
             </div>
 
