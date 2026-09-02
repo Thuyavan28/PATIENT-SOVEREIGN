@@ -24,12 +24,29 @@ export function verifyToken(allowedRoles = []) {
         return res.status(401).json({ error: 'invalid_token', message: 'Token is invalid or expired' });
       }
 
-      // Fetch user from database
-      const userRes = await query(
-        `SELECT id, name, email, role, org_type, org_verified, share_code, public_key, private_key_enc, pin_hash
-         FROM users WHERE id = $1`,
-        [decoded.id]
-      );
+      // Fetch user from database (with retry for Neon serverless transient drops)
+      let userRes;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          userRes = await query(
+            `SELECT id, name, email, role, org_type, org_verified, share_code, public_key, private_key_enc, pin_hash
+             FROM users WHERE id = $1`,
+            [decoded.id]
+          );
+          break;
+        } catch (dbErr) {
+          const isTransient = dbErr.code === 'ECONNRESET' || dbErr.code === 'ENOTFOUND' ||
+            dbErr.message?.includes('Connection terminated') ||
+            dbErr.message?.includes('connection timeout') ||
+            dbErr.message?.includes('connection refused');
+          if (isTransient && attempt === 1) {
+            console.warn('[Auth] Transient DB error, retrying...', dbErr.message);
+            await new Promise(r => setTimeout(r, 600));
+          } else {
+            throw dbErr;
+          }
+        }
+      }
 
       if (userRes.rows.length === 0) {
         return res.status(401).json({ error: 'user_not_found', message: 'User account does not exist' });

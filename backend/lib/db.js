@@ -14,22 +14,27 @@ let isPglite = false;
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 
-if (databaseUrl && databaseUrl.length > 0) {
-  console.log('Using PostgreSQL connection from DATABASE_URL');
-  pool = new Pool({
+function createPool() {
+  const newPool = new Pool({
     connectionString: databaseUrl,
     ssl: databaseUrl.includes('neon.tech') || databaseUrl.includes('sslmode=require')
       ? { rejectUnauthorized: false }
       : undefined,
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    max: 5,
+    min: 1,
+    idleTimeoutMillis: 20000,
+    connectionTimeoutMillis: 15000,
     allowExitOnIdle: false
   });
-  // Reconnect on pool errors instead of crashing
-  pool.on('error', (err) => {
-    console.error('[DB] Pool error (will reconnect automatically):', err.message);
+  newPool.on('error', (err) => {
+    console.error('[DB] Pool client error (pool will self-heal):', err.message);
   });
+  return newPool;
+}
+
+if (databaseUrl && databaseUrl.length > 0) {
+  console.log('Using PostgreSQL connection from DATABASE_URL');
+  pool = createPool();
 } else {
   console.log('DATABASE_URL not provided. Using local embedded PostgreSQL (PGlite)');
   isPglite = true;
@@ -52,8 +57,8 @@ export async function query(text, params = []) {
       rowCount: res.affectedRows !== undefined ? res.affectedRows : (res.rows?.length || 0)
     };
   } else {
-    // Retry once on transient connection errors (common with Neon serverless)
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    // Retry with fresh pool on transient Neon serverless connection drops
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const res = await pool.query(text, params);
         return {
@@ -61,12 +66,21 @@ export async function query(text, params = []) {
           rowCount: res.rowCount || 0
         };
       } catch (err) {
-        const isTransient = err.code === 'ECONNRESET' || err.code === 'ENOTFOUND' ||
+        const isTransient =
+          err.code === 'ECONNRESET' ||
+          err.code === 'ENOTFOUND' ||
+          err.code === 'ECONNREFUSED' ||
           err.message?.includes('Connection terminated') ||
-          err.message?.includes('connection refused');
-        if (isTransient && attempt === 1) {
-          console.warn(`[DB] Transient error on attempt ${attempt}, retrying in 500ms...`, err.message);
-          await new Promise(r => setTimeout(r, 500));
+          err.message?.includes('connection timeout') ||
+          err.message?.includes('connection refused') ||
+          err.message?.includes('getaddrinfo');
+
+        if (isTransient && attempt < 3) {
+          const delay = attempt * 500;
+          console.warn(`[DB] Transient error (attempt ${attempt}), recreating pool in ${delay}ms...`, err.message);
+          try { await pool.end(); } catch (_) {}
+          pool = createPool();
+          await new Promise(r => setTimeout(r, delay));
         } else {
           throw err;
         }
