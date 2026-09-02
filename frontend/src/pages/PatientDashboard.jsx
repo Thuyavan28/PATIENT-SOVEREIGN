@@ -340,10 +340,16 @@ export default function PatientDashboard() {
       toast.success('Access authorization revoked immediately');
       loadData();
     } catch (err) {
-      toast.error('Failed to revoke access');
+      const msg = err.response?.data?.message || err.response?.data?.error || 'Failed to revoke access';
+      if (err.response?.data?.error === 'invalid_pin') {
+        toast.error('Incorrect PIN — revocation cancelled');
+      } else {
+        toast.error(msg);
+      }
       throw err;
     }
   };
+
 
   // Change PIN handler
   const handleChangePinSubmit = async (e) => {

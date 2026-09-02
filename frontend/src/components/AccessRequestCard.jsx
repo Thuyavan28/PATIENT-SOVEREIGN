@@ -23,6 +23,8 @@ export default function AccessRequestCard({
   const [revokePinModalOpen, setRevokePinModalOpen] = useState(false);
   const [revokePin, setRevokePin] = useState('');
   const [revokeLoading, setRevokeLoading] = useState(false);
+  const [revokePinError, setRevokePinError] = useState('');
+
 
   const categoryLabels = {
     allergies: 'Allergies',
@@ -54,7 +56,11 @@ export default function AccessRequestCard({
   };
 
   const handleConfirmRevoke = async () => {
-    if (!revokePin || revokePin.length !== 4) return;
+    if (!revokePin || revokePin.length !== 4) {
+      setRevokePinError('Please enter your 4-digit PIN');
+      return;
+    }
+    setRevokePinError('');
     setRevokeLoading(true);
     try {
       await onRevoke(request.id, revokeReason, revokePin);
@@ -62,12 +68,27 @@ export default function AccessRequestCard({
       setRevokePinModalOpen(false);
       setRevokeReason('');
       setRevokePin('');
+      setRevokePinError('');
     } catch (err) {
-      // error toasted upstream
+      const errCode = err.response?.data?.error;
+      if (errCode === 'invalid_pin') {
+        setRevokePinError('Incorrect PIN — please try again');
+        setRevokePin('');
+      } else {
+        setRevokePinError(err.response?.data?.message || 'Revocation failed');
+      }
     } finally {
       setRevokeLoading(false);
     }
   };
+
+  const handleCloseRevokeModal = () => {
+    setRevokeModalOpen(false);
+    setRevokeReason('');
+    setRevokePin('');
+    setRevokePinError('');
+  };
+
 
   const getTimeRemaining = (expiresAt) => {
     if (!expiresAt) return '—';
@@ -202,18 +223,26 @@ export default function AccessRequestCard({
       {/* Revoke Modal */}
       {revokeModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white border border-black rounded-2xl shadow-2xl max-w-md w-full p-7 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-200">
-              <div>
-                <h3 className="text-sm font-bold text-[#0A0A0A]">Revoke Access Authorization</h3>
-                <p className="text-xs text-[#555555] mt-0.5">This immediately cuts off {request.org_name}'s data access</p>
+          <div className="bg-white border border-black rounded-2xl shadow-2xl max-w-md w-full animate-fadeSlideIn">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-black">
+              <div className="flex items-center space-x-3">
+                <div className="w-7 h-7 bg-[#EF4444] rounded-lg flex items-center justify-center">
+                  <RiAlertLine className="text-white text-sm" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#0A0A0A]">Revoke Access Authorization</h3>
+                  <p className="text-[10px] text-[#555555] mt-0.5">This immediately cuts off {request.org_name}'s data access</p>
+                </div>
               </div>
-              <button onClick={() => setRevokeModalOpen(false)} className="text-[#555555] hover:text-[#0A0A0A]">
-                <RiCloseLine className="text-xl" />
+              <button onClick={handleCloseRevokeModal} className="p-1.5 rounded-lg hover:bg-gray-100 text-[#555555]">
+                <RiCloseLine className="text-lg" />
               </button>
             </div>
 
-            <div className="space-y-4">
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
               <div>
                 <label className="block text-xs font-medium text-[#0A0A0A] mb-1">Reason for Revocation</label>
                 <input
@@ -232,15 +261,31 @@ export default function AccessRequestCard({
                   maxLength={4}
                   placeholder="••••"
                   value={revokePin}
-                  onChange={e => setRevokePin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  className="w-full text-xs border border-black rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-black text-center tracking-[0.5em] text-xl font-bold"
+                  autoFocus
+                  onChange={e => {
+                    setRevokePin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                    if (revokePinError) setRevokePinError('');
+                  }}
+                  className={`w-full text-xs border rounded-xl px-3 py-2 outline-none focus:ring-1 text-center tracking-[0.5em] text-xl font-bold transition-colors ${
+                    revokePinError
+                      ? 'border-[#EF4444] focus:ring-[#EF4444] bg-red-50'
+                      : 'border-black focus:ring-black'
+                  }`}
                 />
+                {revokePinError && (
+                  <div className="flex items-center space-x-1.5 mt-1.5">
+                    <RiAlertLine className="text-[#EF4444] text-xs shrink-0" />
+                    <p className="text-[11px] text-[#EF4444] font-medium">{revokePinError}</p>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="flex space-x-3 pt-2 border-t border-gray-100">
+            {/* Footer */}
+            <div className="flex space-x-3 px-6 py-4 border-t border-gray-100">
               <button
-                onClick={() => setRevokeModalOpen(false)}
+                onClick={handleCloseRevokeModal}
+                disabled={revokeLoading}
                 className="flex-1 py-2 text-xs border border-black rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -248,9 +293,13 @@ export default function AccessRequestCard({
               <button
                 onClick={handleConfirmRevoke}
                 disabled={revokeLoading || revokePin.length !== 4}
-                className="flex-1 py-2 text-xs font-bold bg-[#EF4444] text-white rounded-xl hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className="flex-1 py-2 text-xs font-bold bg-[#EF4444] text-white rounded-xl hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center justify-center space-x-1.5"
               >
-                {revokeLoading ? 'Revoking...' : 'Confirm Revocation'}
+                {revokeLoading ? (
+                  <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>Revoking...</span></>
+                ) : (
+                  'Confirm Revocation'
+                )}
               </button>
             </div>
           </div>
