@@ -26,6 +26,14 @@ import {
 } from 'react-icons/ri';
 
 import Sidebar from '../components/Sidebar';
+import Loader from '../components/Loader';
+import {
+  RiShieldFlashLine,
+  RiKeyLine,
+  RiFileShieldLine,
+  RiInformationLine,
+  RiFlashlightLine
+} from 'react-icons/ri';
 import TopBar from '../components/TopBar';
 import StatsCard from '../components/StatsCard';
 import FraudFlagBanner from '../components/FraudFlagBanner';
@@ -82,25 +90,28 @@ export default function OrgDashboard() {
   const pendingRequests = requests.filter((r) => r.status === 'pending');
 
   // Handle Share Code Lookup
-  const handleLookup = async (e) => {
-    e.preventDefault();
+  const handleLookup = async (e, directCode = null) => {
+    if (e && e.preventDefault) e.preventDefault();
     setSearchError('');
     setFoundPatient(null);
     setRequestSuccessMsg('');
     setTriggeredFlags([]);
 
-    const cleanCode = shareCodeInput.trim().toUpperCase();
+    const cleanCode = (directCode || shareCodeInput).trim().toUpperCase();
     if (cleanCode.length !== 6) {
-      setSearchError('Share code must be exactly 6 alphanumeric characters');
+      setSearchError('Share code must be exactly 6 alphanumeric characters (e.g. A1B2C3)');
       return;
     }
 
+    setShareCodeInput(cleanCode);
     setSearching(true);
     try {
       const res = await api.get(`/patients/lookup/${cleanCode}`);
       setFoundPatient(res.data);
+      toast.success(`Patient resolved: ${res.data.name} (${res.data.share_code})`);
     } catch (err) {
-      setSearchError('No patient found with this share code');
+      setSearchError(err.response?.data?.error || 'No patient found with this share code');
+      toast.error('Patient lookup failed. Verify 6-character code.');
     } finally {
       setSearching(false);
     }
@@ -303,54 +314,211 @@ export default function OrgDashboard() {
 
         {/* TAB 2: FIND PATIENT & REQUEST ACCESS */}
         {tab === 'find' && (
-          <div className="space-y-6 max-w-3xl animate-fadeSlideIn">
-            <div className="flex items-start justify-between">
+          <div className="space-y-6 max-w-4xl mx-auto animate-fadeSlideIn font-sans">
+            {/* Page Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h1 className="text-2xl font-bold text-[#0A0A0A] tracking-tight">
+                <h1 className="text-2xl font-bold font-sans text-[#0A0A0A] tracking-tight">
                   Find Patient
                 </h1>
-                <p className="text-xs text-[#555555] mt-1">
+                <p className="text-xs font-normal font-sans text-[#555555] mt-1">
                   Lookup patient identity via 6-character sovereign share code
                 </p>
               </div>
+
+              {/* Demo Patient Fast-Fill Button */}
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-medium text-[#555555]">Demo Patient:</span>
+                <button
+                  type="button"
+                  onClick={() => handleLookup(null, 'A1B2C3')}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-black text-white rounded-xl text-xs font-medium font-sans hover:bg-[#333333] transition-colors shadow-xs"
+                >
+                  <RiFlashlightLine className="text-sm text-[#F59E0B]" />
+                  <span>Auto-Fill Rahul (A1B2C3)</span>
+                </button>
+              </div>
             </div>
 
-            {/* Search Card matching Image 2 Filters styling */}
-            <div className="bg-white border border-black rounded-2xl p-6">
-              <h2 className="text-sm font-semibold text-[#0A0A0A] mb-1">
-                Enter Sovereign Share Code
-              </h2>
-              <p className="text-xs text-[#555555] mb-4">
-                Identity ≠ Authorization ≠ Access. Share code only resolves identity metadata, never medical data.
+            {/* Search Card */}
+            <div className="bg-white border border-black rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-sm font-medium font-sans text-[#0A0A0A]">
+                  Enter Sovereign Share Code
+                </h2>
+                <span className="text-[11px] font-mono text-[#555555]">
+                  Protocol: Zero-Knowledge Discovery
+                </span>
+              </div>
+              <p className="text-xs font-normal font-sans text-[#555555] mb-4">
+                Identity ≠ Authorization ≠ Access. Resolves identity confirmation only — zero medical data is exposed.
               </p>
 
-              <form onSubmit={handleLookup} className="flex space-x-3">
+              <form onSubmit={(e) => handleLookup(e)} className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
-                  <RiSearchLine className="absolute left-3.5 top-3 text-[#777777] text-sm" />
+                  <RiSearchLine className="absolute left-3.5 top-3.5 text-[#777777] text-base" />
                   <input
                     type="text"
                     maxLength={6}
-                    placeholder="Enter 6-character share code (e.g. A1B2C3)"
+                    placeholder="ENTER 6-CHARACTER SHARE CODE (E.G. A1B2C3)"
                     value={shareCodeInput}
                     onChange={(e) => setShareCodeInput(e.target.value.toUpperCase())}
-                    className="w-full pl-10 pr-4 py-2.5 font-mono uppercase tracking-widest text-base font-bold rounded-xl border border-black"
+                    className="w-full pl-10 pr-4 py-3 font-mono uppercase tracking-widest text-base font-bold rounded-xl border border-black focus:ring-1 focus:ring-black"
                   />
                 </div>
                 <button
                   type="submit"
-                  disabled={searching || shareCodeInput.length !== 6}
-                  className="border border-[#0A0A0A] bg-black text-white px-6 py-2.5 rounded-xl text-xs font-semibold hover:bg-[#333333] transition-colors disabled:opacity-50 shrink-0"
+                  disabled={searching}
+                  className="border border-black bg-black text-white px-8 py-3 rounded-xl text-xs font-medium font-sans hover:bg-[#333333] transition-colors disabled:opacity-50 shrink-0 flex items-center justify-center space-x-2"
                 >
-                  {searching ? 'Looking up...' : 'Find Patient'}
+                  {searching ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Querying Ledger...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RiSearchLine className="text-sm" />
+                      <span>Find Patient</span>
+                    </>
+                  )}
                 </button>
               </form>
 
               {searchError && (
-                <p className="text-xs text-[#EF4444] font-medium mt-3 animate-fadeSlideIn">
-                  {searchError}
-                </p>
+                <div className="mt-3 p-3 bg-red-50 border border-[#EF4444] rounded-xl text-xs font-medium text-[#EF4444] flex items-center space-x-2 animate-fadeSlideIn">
+                  <RiAlertLine className="text-base shrink-0" />
+                  <span>{searchError}</span>
+                </div>
               )}
             </div>
+
+            {/* Centered Loader when searching */}
+            {searching && (
+              <div className="bg-white border border-black rounded-2xl p-6 shadow-sm">
+                <Loader
+                  message="Resolving Patient from Sovereign Neon Ledger..."
+                  subtitle="Enforcing Zero-Trust Protocol: Resolving Non-Medical Identity Metadata Only"
+                />
+              </div>
+            )}
+
+            {/* When No Patient Searched Yet: Rich 3-Step Zero-Trust Architecture Cards */}
+            {!foundPatient && !searching && (
+              <div className="space-y-6 animate-fadeSlideIn">
+                {/* 3 Step Protocol Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white border border-black rounded-2xl p-5 space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center font-bold text-sm mb-3">
+                        1
+                      </div>
+                      <h3 className="text-sm font-medium font-sans text-[#0A0A0A]">
+                        Identity Confirmation
+                      </h3>
+                      <p className="text-xs font-normal font-sans text-[#555555] mt-1.5 leading-relaxed">
+                        A share code only confirms the patient's identity. Zero health records, diagnoses, or lab reports are ever exposed during discovery.
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-gray-100 flex items-center space-x-1.5 text-[11px] font-mono text-[#555555]">
+                      <RiShieldCheckLine className="text-sm text-[#16A34A]" />
+                      <span>Zero Data Leakage</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-black rounded-2xl p-5 space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center font-bold text-sm mb-3">
+                        2
+                      </div>
+                      <h3 className="text-sm font-medium font-sans text-[#0A0A0A]">
+                        Granular Scope Boundary
+                      </h3>
+                      <p className="text-xs font-normal font-sans text-[#555555] mt-1.5 leading-relaxed">
+                        You select strictly required categories (e.g. Allergies only) and an exact validity window (6h to 72h). Blanket access is cryptographically forbidden.
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-gray-100 flex items-center space-x-1.5 text-[11px] font-mono text-[#555555]">
+                      <RiKeyLine className="text-sm text-[#0A0A0A]" />
+                      <span>Time-Bound Scoping</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-black rounded-2xl p-5 space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center font-bold text-sm mb-3">
+                        3
+                      </div>
+                      <h3 className="text-sm font-medium font-sans text-[#0A0A0A]">
+                        Sovereign PIN Signature
+                      </h3>
+                      <p className="text-xs font-normal font-sans text-[#555555] mt-1.5 leading-relaxed">
+                        Access is never granted automatically. The patient must enter their 4-digit cryptographic PIN to decrypt their RSA-2048 private key and sign the grant.
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-gray-100 flex items-center space-x-1.5 text-[11px] font-mono text-[#555555]">
+                      <RiFileShieldLine className="text-sm text-[#0A0A0A]" />
+                      <span>RSA-PSS Verified</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active Security & Fraud Monitoring Banner */}
+                <div className="bg-white border border-black rounded-2xl p-6">
+                  <div className="flex items-start justify-between pb-3 border-b border-gray-100">
+                    <div>
+                      <h3 className="text-sm font-medium font-sans text-[#0A0A0A]">
+                        Synchronous Healthcare Fraud & Telemetry Safeguards
+                      </h3>
+                      <p className="text-xs font-normal font-sans text-[#555555] mt-0.5">
+                        Active security rules enforced in real time on all access request submissions
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-0.5 bg-green-50 border border-[#16A34A] text-[#16A34A] rounded-full text-[10px] font-mono font-bold uppercase">
+                      Active
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-xs font-sans">
+                    <div className="p-3 bg-gray-50 border border-black rounded-xl">
+                      <span className="font-mono font-bold text-[#0A0A0A] block">
+                        Rule 1: MULTI_ORG_ATTEMPT
+                      </span>
+                      <p className="text-[#555555] text-[11px] mt-1">
+                        Detects prescription shopping across $\ge 3$ distinct organizations within 60 minutes.
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-gray-50 border border-black rounded-xl">
+                      <span className="font-mono font-bold text-[#0A0A0A] block">
+                        Rule 2: DUPLICATE_REQUEST
+                      </span>
+                      <p className="text-[#555555] text-[11px] mt-1">
+                        Detects redundant access requests for the same patient within 10 minutes.
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-gray-50 border border-black rounded-xl">
+                      <span className="font-mono font-bold text-[#0A0A0A] block">
+                        Rule 3: EXPIRED_PRESCRIPTION
+                      </span>
+                      <p className="text-[#555555] text-[11px] mt-1">
+                        Prevents dispensing or accessing prescriptions that have passed their clinical validity date.
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-gray-50 border border-black rounded-xl">
+                      <span className="font-mono font-bold text-[#0A0A0A] block">
+                        Rule 4: UNVERIFIED_ORG
+                      </span>
+                      <p className="text-[#555555] text-[11px] mt-1">
+                        Automatically flags organizations awaiting administrative identity verification.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Found Patient Card & Request Form */}
             {foundPatient && (
