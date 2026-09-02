@@ -7,16 +7,25 @@ import {
   RiAlertLine,
   RiCheckLine,
   RiCloseLine,
-  RiErrorWarningLine
+  RiErrorWarningLine,
+  RiDeleteBinLine
 } from 'react-icons/ri';
+
 import api from '../lib/api';
 import { toast } from '../lib/toast';
 
-export default function PrescriptionCard({ rx, onRefresh }) {
+export default function PrescriptionCard({ rx, onRefresh, onDeleted }) {
   const [expandedChain, setExpandedChain] = useState(false);
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
+
+  // Delete state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletePin, setDeletePin] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deletePinError, setDeletePinError] = useState('');
+
 
   const statusColors = {
     active: 'bg-green-50 text-[#16A34A] border-green-200',
@@ -43,6 +52,38 @@ export default function PrescriptionCard({ rx, onRefresh }) {
       setVerifying(false);
     }
   };
+
+  const handleDelete = async () => {
+    if (deletePin.length !== 4) {
+      setDeletePinError('Please enter your 4-digit PIN');
+      return;
+    }
+    setDeletePinError('');
+    setDeleteLoading(true);
+    try {
+      await api.delete(`/prescriptions/${rx.id}`, { data: { pin: deletePin } });
+      toast.success(`Prescription for ${rx.drug_name} deleted`);
+      setDeleteModalOpen(false);
+      if (onDeleted) onDeleted(rx.id);
+      else if (onRefresh) onRefresh();
+    } catch (err) {
+      if (err.response?.data?.error === 'invalid_pin') {
+        setDeletePinError('Incorrect PIN — please try again');
+        setDeletePin('');
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to delete prescription');
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setDeletePin('');
+    setDeletePinError('');
+  };
+
 
   return (
     <div className="bg-white border border-black rounded-2xl p-6 shadow-sm space-y-4 hover:border-black transition-colors font-sans">
@@ -121,29 +162,43 @@ export default function PrescriptionCard({ rx, onRefresh }) {
         </p>
       )}
 
-      {/* Action buttons & Expand Chain */}
-      <div className="pt-2 border-t border-gray-100 flex items-center justify-between font-sans">
-        <button
-          onClick={() => setExpandedChain(!expandedChain)}
-          className="flex items-center space-x-1 text-xs font-medium font-sans text-[#555555] hover:text-[#0A0A0A] transition-colors"
-        >
-          <span>Hash Chain Details</span>
-          {expandedChain ? (
-            <RiArrowUpSLine className="text-sm" />
-          ) : (
-            <RiArrowDownSLine className="text-sm" />
-          )}
-        </button>
+        {/* Action buttons */}
+        <div className="pt-2 border-t border-gray-100 flex items-center justify-between font-sans">
+          <button
+            onClick={() => setExpandedChain(!expandedChain)}
+            className="flex items-center space-x-1 text-xs font-medium font-sans text-[#555555] hover:text-[#0A0A0A] transition-colors"
+          >
+            <span>Hash Chain Details</span>
+            {expandedChain ? (
+              <RiArrowUpSLine className="text-sm" />
+            ) : (
+              <RiArrowDownSLine className="text-sm" />
+            )}
+          </button>
 
-        <button
-          onClick={handleVerify}
-          disabled={verifying}
-          className="flex items-center space-x-1.5 px-3 py-1.5 border border-[#0A0A0A] text-[#0A0A0A] bg-white hover:bg-black hover:text-white rounded-xl text-xs font-medium font-sans transition-colors disabled:opacity-50"
-        >
-          <RiShieldCheckLine className="text-sm" />
-          <span>{verifying ? 'Verifying...' : 'Verify Integrity'}</span>
-        </button>
-      </div>
+          <div className="flex items-center space-x-2">
+            {/* Delete button — only for non-cancelled prescriptions */}
+            {rx.status !== 'cancelled' && (
+              <button
+                onClick={() => setDeleteModalOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 border border-[#EF4444] text-[#EF4444] bg-white hover:bg-[#EF4444] hover:text-white rounded-xl text-xs font-medium font-sans transition-colors"
+              >
+                <RiDeleteBinLine className="text-sm" />
+                <span>Delete</span>
+              </button>
+            )}
+
+            <button
+              onClick={handleVerify}
+              disabled={verifying}
+              className="flex items-center space-x-1.5 px-3 py-1.5 border border-[#0A0A0A] text-[#0A0A0A] bg-white hover:bg-black hover:text-white rounded-xl text-xs font-medium font-sans transition-colors disabled:opacity-50"
+            >
+              <RiShieldCheckLine className="text-sm" />
+              <span>{verifying ? 'Verifying...' : 'Verify Integrity'}</span>
+            </button>
+          </div>
+        </div>
+
 
       {/* Collapsible Hash Chain Block */}
       {expandedChain && (
@@ -274,6 +329,99 @@ export default function PrescriptionCard({ rx, onRefresh }) {
           </div>
         </div>
       )}
+
+      {/* Delete Prescription Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white border border-black rounded-2xl shadow-2xl max-w-md w-full animate-fadeSlideIn">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-black">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-[#EF4444] rounded-lg flex items-center justify-center">
+                  <RiDeleteBinLine className="text-white text-base" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#0A0A0A]">Delete Prescription</h3>
+                  <p className="text-[10px] text-[#555555] mt-0.5">Patient Sovereign Right to Erasure</p>
+                </div>
+              </div>
+              <button onClick={closeDeleteModal} className="p-1.5 rounded-lg hover:bg-gray-100 text-[#555555]">
+                <RiCloseLine className="text-lg" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
+              <div className="p-3 bg-red-50 border border-[#EF4444]/30 rounded-xl text-xs text-red-900 leading-relaxed">
+                You are about to permanently delete the prescription for <strong className="text-black font-semibold">{rx.drug_name}</strong> ({rx.dosage}, prescribed by {rx.doctor_name || 'physician'}). This action cannot be undone.
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#0A0A0A] mb-1">
+                  Authorize Deletion with your 4-digit PIN
+                </label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  placeholder="••••"
+                  value={deletePin}
+                  autoFocus
+                  onChange={e => {
+                    setDeletePin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                    if (deletePinError) setDeletePinError('');
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && deletePin.length === 4 && !deleteLoading) {
+                      handleDelete();
+                    }
+                  }}
+                  className={`w-full text-xs border rounded-xl px-3 py-2 outline-none focus:ring-1 text-center tracking-[0.5em] text-xl font-bold transition-colors ${
+                    deletePinError
+                      ? 'border-[#EF4444] focus:ring-[#EF4444] bg-red-50'
+                      : 'border-black focus:ring-black'
+                  }`}
+                />
+                {deletePinError && (
+                  <div className="flex items-center space-x-1.5 mt-1.5">
+                    <RiAlertLine className="text-[#EF4444] text-xs shrink-0" />
+                    <p className="text-[11px] text-[#EF4444] font-medium">{deletePinError}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex space-x-3 px-6 py-4 border-t border-gray-100">
+              <button
+                onClick={closeDeleteModal}
+                disabled={deleteLoading}
+                className="flex-1 py-2 text-xs border border-black rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteLoading || deletePin.length !== 4}
+                className="flex-1 py-2 text-xs font-bold bg-[#EF4444] text-white rounded-xl hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center justify-center space-x-1.5"
+              >
+                {deleteLoading ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <RiDeleteBinLine className="text-sm" />
+                    <span>Confirm Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

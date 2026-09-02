@@ -237,42 +237,52 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   ].map(k => k?.trim()).filter(Boolean);
 
   if (keys.length > 0 && drugNames.length > 0) {
+    const candidateModels = [
+      'minimax/minimax-m2.7:free',
+      'liquid/lfm-2.5-2.6b:free',
+      'nvidia/nemotron-3.5-lightning:free'
+    ];
+
     for (let attempt = 0; attempt < keys.length; attempt++) {
       const keyIdx = (currentKeyIndex + attempt) % keys.length;
       const apiKey = keys[keyIdx];
 
-      try {
-        console.log(`[AI Clinical] Full scoped-data analysis via OpenRouter key #${keyIdx + 1}...`);
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-            'HTTP-Referer': 'http://localhost:5173',
-            'X-Title': 'RxVault Clinical AI'
-          },
-          body: JSON.stringify({
-            model: 'mistralai/mistral-7b-instruct:free',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a senior clinical pharmacist AI conducting a medication safety review. Respond ONLY with valid JSON matching the exact schema requested. Be clinically precise about toxic dosages — warfarin 1000mg is lethal (normal max is ~10mg/day).'
-              },
-              { role: 'user', content: fullPrompt }
-            ],
-            temperature: 0.05,
-            max_tokens: 800
-          })
-        });
+      for (const modelId of candidateModels) {
+        try {
+          console.log(`[AI Clinical] Full scoped-data analysis via OpenRouter (${modelId}) key #${keyIdx + 1}...`);
+          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`,
+              'HTTP-Referer': 'http://localhost:5173',
+              'X-Title': 'RxVault Clinical AI'
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a senior clinical pharmacist AI conducting a medication safety review. Respond ONLY with valid JSON matching the exact schema requested. Be clinically precise about toxic dosages — warfarin 1000mg is lethal (normal max is ~10mg/day).'
+                },
+                { role: 'user', content: fullPrompt }
+              ],
+              temperature: 0.05,
+              max_tokens: 800
+            })
+          });
 
-        if (!response.ok) {
-          console.warn(`[AI Clinical] Key #${keyIdx + 1} returned ${response.status}. Rotating...`);
-          continue;
-        }
+          if (!response.ok) {
+            console.warn(`[AI Clinical] Model ${modelId} with key #${keyIdx + 1} returned ${response.status}. Trying next...`);
+            continue;
+          }
 
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content?.trim();
-        if (!content) { console.warn(`[AI Clinical] Empty response from key #${keyIdx + 1}.`); continue; }
+          const data = await response.json();
+          const content = data.choices?.[0]?.message?.content?.trim();
+          if (!content) {
+            console.warn(`[AI Clinical] Empty response from ${modelId}. Trying next...`);
+            continue;
+          }
 
         currentKeyIndex = (keyIdx + 1) % keys.length;
 
@@ -334,8 +344,9 @@ Respond ONLY with valid JSON (no markdown, no explanation):
           recommendations: parsed.recommendations || [],
           safe: isSafe
         };
-      } catch (err) {
-        console.warn(`[AI Clinical] Error with key #${keyIdx + 1}: ${err.message}. Rotating...`);
+        } catch (err) {
+          console.warn(`[AI Clinical] Error with key #${keyIdx + 1}: ${err.message}. Rotating...`);
+        }
       }
     }
   }

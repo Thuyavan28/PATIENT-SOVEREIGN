@@ -254,4 +254,67 @@ router.get('/:id/verify', verifyToken(['patient', 'org', 'admin']), async (req, 
   }
 });
 
+/**
+ * DELETE /api/prescriptions/:id
+ * Patient's sovereign right to delete their own prescription.
+ * Requires PIN verification. Uses soft-delete to preserve hash chain integrity.
+ */
+router.delete('/:id', verifyToken(['patient']), async (req, res) => {
+  try {
+    const { pin } = req.body;
+
+    if (!pin) {
+      return res.status(400).json({ error: 'PIN required to delete prescription' });
+    }
+
+    const validPin = await verifyUserPin(req.user, pin);
+    if (!validPin) {
+      return res.status(403).json({ error: 'invalid_pin', message: 'Invalid 4-digit PIN' });
+    }
+
+    // Verify the prescription belongs to this patient
+    const rxRes = await query(
+      'SELECT * FROM prescriptions WHERE id = $1 AND patient_id = $2',
+      [req.params.id, req.user.id]
+    );
+
+    if (rxRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Prescription not found or access denied' });
+    }
+
+    const rx = rxRes.rows[0];
+
+    // Remove references and delete prescription (Sovereign right to erasure)
+    await query(
+      `UPDATE access_requests SET specific_prescription_id = NULL WHERE specific_prescription_id = $1`,
+      [rx.id]
+    );
+    await query(
+      `DELETE FROM dispensation_events WHERE prescription_id = $1`,
+      [rx.id]
+    );
+    await query(
+      `DELETE FROM prescriptions WHERE id = $1`,
+      [rx.id]
+    );
+
+    await logAuditEvent({
+      actorId: req.user.id,
+      actorRole: 'patient',
+      action: 'prescription_deleted',
+      targetId: rx.id,
+      targetType: 'prescription',
+      metadata: {
+        drug_name: rx.drug_name,
+        reason: 'Patient exercised sovereign deletion right'
+      }
+    });
+
+    res.json({ success: true, message: `Prescription for ${rx.drug_name} has been deleted` });
+  } catch (err) {
+    console.error('Delete prescription error:', err);
+    res.status(500).json({ error: 'Failed to delete prescription', message: err.message });
+  }
+});
+
 export default router;
