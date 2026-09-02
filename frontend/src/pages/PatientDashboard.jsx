@@ -96,12 +96,11 @@ export default function PatientDashboard() {
     description: '',
     file_name: '',
     mime_type: '',
-    file_data: '',
-    pin: ''
+    file_data: ''
   });
   const [docFilePreview, setDocFilePreview] = useState(null);
   const [docSubmitting, setDocSubmitting] = useState(false);
-  const [docPinError, setDocPinError] = useState(false);
+
 
   // Vault basic profile form state
   const [profileForm, setProfileForm] = useState({});
@@ -267,21 +266,28 @@ export default function PatientDashboard() {
     reader.readAsDataURL(file);
   };
 
-  // Document Upload Submit
+  // Document Upload Submit — no PIN needed, JWT authentication is sufficient
   const handleUploadDocument = async (e) => {
     e.preventDefault();
     if (!newDoc.file_data) {
       toast.error('Please select a file to upload');
       return;
     }
-    if (newDoc.pin.length !== 4) {
-      setDocPinError('PIN must be 4 digits');
+    if (!newDoc.title.trim()) {
+      toast.error('Please enter a document title');
       return;
     }
-    setDocPinError(false);
     setDocSubmitting(true);
     try {
-      const res = await api.post('/documents', newDoc);
+      const payload = {
+        title: newDoc.title,
+        document_type: newDoc.document_type,
+        description: newDoc.description,
+        file_name: newDoc.file_name,
+        mime_type: newDoc.mime_type,
+        file_data: newDoc.file_data
+      };
+      const res = await api.post('/documents', payload);
       setDocuments((prev) => [res.data, ...prev]);
       toast.success('Document uploaded with SHA-256 integrity hash');
       setNewDoc({
@@ -290,22 +296,18 @@ export default function PatientDashboard() {
         description: '',
         file_name: '',
         mime_type: '',
-        file_data: '',
-        pin: ''
+        file_data: ''
       });
       setDocFilePreview(null);
       setUploadDocModalOpen(false);
       loadData();
     } catch (err) {
-      if (err.response?.data?.error === 'invalid_pin') {
-        setDocPinError('Incorrect 4-digit PIN');
-      } else {
-        toast.error(err.response?.data?.error || 'Failed to upload document');
-      }
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to upload document');
     } finally {
       setDocSubmitting(false);
     }
   };
+
 
   // Access Request Approval
   const handleApproveRequest = async (requestId, pin) => {
@@ -921,7 +923,7 @@ export default function PatientDashboard() {
 
             {/* Slide-Over Panel: Add New Prescription */}
             {rxSlideOverOpen && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex justify-end">
                 <div className="bg-white w-full max-w-lg h-full p-6 overflow-y-auto shadow-2xl flex flex-col justify-between animate-fadeSlideIn">
                   <div>
                     <div className="flex items-center justify-between pb-4 border-b border-black">
@@ -1160,45 +1162,44 @@ export default function PatientDashboard() {
               )}
             </div>
 
-            {/* Upload Document Modal */}
+            {/* Upload Document Modal — full screen z-[9999] */}
             {uploadDocModalOpen && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white border border-black rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-fadeSlideIn">
-                  <div className="flex items-center justify-between pb-3 border-b border-black">
-                    <h3 className="text-base font-semibold text-[#0A0A0A]">
-                      Upload Medical Document
-                    </h3>
-                    <button
-                      onClick={() => setUploadDocModalOpen(false)}
-                      className="text-[#555555] hover:text-[#0A0A0A]"
-                    >
-                      <RiCloseLine className="text-xl" />
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                <div className="bg-white border border-black rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fadeSlideIn">
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-black">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-[#0A0A0A] rounded-lg flex items-center justify-center">
+                        <RiUploadCloudLine className="text-white text-base" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-[#0A0A0A]">Upload Medical Document</h3>
+                        <p className="text-[10px] text-[#555555] font-mono">SHA-256 integrity hash computed on upload</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setUploadDocModalOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-[#555555]">
+                      <RiCloseLine className="text-lg" />
                     </button>
                   </div>
 
-                  <form onSubmit={handleUploadDocument} className="py-4 space-y-3 text-xs">
+                  <form onSubmit={handleUploadDocument} className="px-6 py-5 space-y-4 text-xs">
                     <div>
-                      <label className="block font-medium text-[#0A0A0A] mb-1">
-                        Document Title <span className="text-[#EF4444]">*</span>
-                      </label>
+                      <label className="block font-medium text-[#0A0A0A] mb-1">Document Title <span className="text-[#EF4444]">*</span></label>
                       <input
                         type="text"
                         required
-                        placeholder="Complete Blood Count Report"
+                        placeholder="e.g. Complete Blood Count Report"
                         value={newDoc.title}
                         onChange={(e) => setNewDoc({ ...newDoc, title: e.target.value })}
-                        className="w-full rounded-xl"
+                        className="w-full"
                       />
                     </div>
 
                     <div>
-                      <label className="block font-medium text-[#0A0A0A] mb-1">
-                        Document Type <span className="text-[#EF4444]">*</span>
-                      </label>
+                      <label className="block font-medium text-[#0A0A0A] mb-1">Document Type <span className="text-[#EF4444]">*</span></label>
                       <select
                         value={newDoc.document_type}
                         onChange={(e) => setNewDoc({ ...newDoc, document_type: e.target.value })}
-                        className="w-full rounded-xl"
+                        className="w-full"
                       >
                         <option value="lab_report">Lab Report</option>
                         <option value="xray">X-Ray</option>
@@ -1210,66 +1211,67 @@ export default function PatientDashboard() {
                     </div>
 
                     <div>
-                      <label className="block font-medium text-[#0A0A0A] mb-1">
-                        File (.pdf, .jpg, .png — Max 10MB) <span className="text-[#EF4444]">*</span>
-                      </label>
+                      <label className="block font-medium text-[#0A0A0A] mb-1">Description</label>
+                      <input
+                        type="text"
+                        placeholder="Optional notes about this document"
+                        value={newDoc.description}
+                        onChange={(e) => setNewDoc({ ...newDoc, description: e.target.value })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-medium text-[#0A0A0A] mb-1">File (.pdf, .jpg, .png — Max 10MB) <span className="text-[#EF4444]">*</span></label>
                       <input
                         type="file"
                         accept=".pdf,image/png,image/jpeg,image/jpg"
                         required
                         onChange={handleFileChange}
-                        className="w-full p-2 border border-dashed border-black rounded-xl cursor-pointer hover:bg-gray-50"
+                        className="w-full p-2 border border-dashed border-black rounded-xl cursor-pointer hover:bg-gray-50 bg-gray-50/50"
                       />
                     </div>
 
                     {docFilePreview && (
-                      <div className="p-2 border border-gray-200 rounded-xl bg-gray-50 flex items-center justify-center max-h-36 overflow-hidden">
-                        <img src={docFilePreview} alt="Preview" className="max-h-32 object-contain" />
+                      <div className="p-2 border border-black rounded-xl bg-gray-50 flex items-center justify-center max-h-40 overflow-hidden">
+                        <img src={docFilePreview} alt="Preview" className="max-h-36 object-contain rounded-lg" />
                       </div>
                     )}
 
-                    {/* PIN input for upload */}
-                    <div className="pt-3 border-t border-gray-100 flex flex-col items-center bg-gray-50/70 p-3 rounded-xl">
-                      <label className="block text-xs font-semibold text-[#0A0A0A] text-center mb-1">
-                        Authorization PIN
-                      </label>
-                      <p className="text-[11px] text-[#555555] text-center mb-2">
-                        Enter your PIN to authorize storage and generate cryptographic content hash
-                      </p>
-                      <PinInput
-                        value={newDoc.pin}
-                        onChange={(p) => {
-                          setNewDoc({ ...newDoc, pin: p });
-                          if (docPinError) setDocPinError(false);
-                        }}
-                        error={docPinError}
-                      />
-                    </div>
+                    {newDoc.file_name && (
+                      <div className="flex items-center space-x-2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl">
+                        <RiFolderLine className="text-[#555555] text-sm shrink-0" />
+                        <span className="text-[#0A0A0A] font-medium truncate">{newDoc.file_name}</span>
+                      </div>
+                    )}
 
-                    <div className="flex justify-end space-x-2 pt-3 border-t border-black">
+                    <div className="flex justify-end space-x-3 pt-3 border-t border-gray-100">
                       <button
                         type="button"
                         onClick={() => setUploadDocModalOpen(false)}
-                        className="px-4 py-2 border border-black rounded-xl text-xs hover:bg-gray-50"
+                        className="px-4 py-2 border border-black rounded-xl text-xs hover:bg-gray-50 transition-colors"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        disabled={docSubmitting || newDoc.pin.length !== 4}
-                        className="px-4 py-2 bg-black text-white rounded-xl text-xs font-medium hover:bg-[#333333] disabled:opacity-50"
+                        disabled={docSubmitting || !newDoc.file_data}
+                        className="px-5 py-2 bg-black text-white rounded-xl text-xs font-bold hover:bg-[#333333] disabled:opacity-40 transition-colors flex items-center space-x-1.5"
                       >
-                        {docSubmitting ? 'Securing Document...' : 'Upload & Compute Hash'}
+                        <RiUploadCloudLine className="text-sm" />
+                        <span>{docSubmitting ? 'Uploading...' : 'Upload & Compute Hash'}</span>
                       </button>
                     </div>
                   </form>
                 </div>
               </div>
             )}
+
           </div>
         )}
 
         {/* TAB 5: ACCESS REQUESTS */}
+
         {tab === 'requests' && (
           <div className="space-y-6 animate-fadeSlideIn">
             <div className="flex items-start justify-between">

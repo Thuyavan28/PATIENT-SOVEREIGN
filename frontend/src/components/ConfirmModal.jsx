@@ -47,7 +47,7 @@ export default function ConfirmModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
       <div className="bg-white border border-black rounded-xl shadow-2xl max-w-md w-full p-6 animate-fadeSlideIn">
         <div className="flex items-center justify-between pb-3 border-b border-black">
           <div className="flex items-center space-x-2 text-[#0A0A0A]">

@@ -213,7 +213,7 @@ export default function DocumentCard({ doc, onDeleted }) {
 
       {/* Inline Preview Modal */}
       {previewOpen && fullDoc && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <div className="bg-white border border-black rounded-xl shadow-2xl max-w-3xl w-full h-[80vh] flex flex-col p-6 animate-fadeSlideIn">
             <div className="flex items-center justify-between pb-3 border-b border-black">
               <div>

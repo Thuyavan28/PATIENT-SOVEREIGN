@@ -8,7 +8,9 @@ const router = Router();
 
 /**
  * POST /api/documents
- * Upload a medical document with PIN authorization and SHA-256 integrity hash
+ * Upload a medical document with SHA-256 content integrity hash.
+ * PIN is NOT required — document upload only needs valid JWT authentication.
+ * PIN is reserved exclusively for cryptographic operations (RSA signing, access approval).
  */
 router.post('/', verifyToken(['patient']), async (req, res) => {
   try {
@@ -18,18 +20,11 @@ router.post('/', verifyToken(['patient']), async (req, res) => {
       description,
       file_data,
       file_name,
-      mime_type,
-      pin
+      mime_type
     } = req.body;
 
-    if (!title || !document_type || !file_data || !file_name || !mime_type || !pin) {
-      return res.status(400).json({ error: 'Missing required document fields or PIN' });
-    }
-
-    // Verify PIN
-    const validPin = await verifyUserPin(req.user, pin);
-    if (!validPin) {
-      return res.status(403).json({ error: 'invalid_pin', message: 'Invalid 4-digit PIN' });
+    if (!title || !document_type || !file_data || !file_name || !mime_type) {
+      return res.status(400).json({ error: 'Missing required fields: title, document_type, file_data, file_name, mime_type' });
     }
 
     // Calculate SHA-256 content hash of the base64 file data
@@ -79,6 +74,7 @@ router.post('/', verifyToken(['patient']), async (req, res) => {
     res.status(500).json({ error: 'Failed to upload document', message: err.message });
   }
 });
+
 
 /**
  * GET /api/documents
