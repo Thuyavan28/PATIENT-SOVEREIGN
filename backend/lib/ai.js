@@ -239,19 +239,19 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   if (keys.length > 0 && drugNames.length > 0) {
     const candidateModels = [
       'minimax/minimax-m2.7:free',
-      'liquid/lfm-2.5-2.6b:free',
-      'nvidia/nemotron-3.5-lightning:free'
+      'google/gemma-4-26b-a4b-it:free'
     ];
 
-    for (let attempt = 0; attempt < keys.length; attempt++) {
+    for (let attempt = 0; attempt < Math.min(keys.length, 2); attempt++) {
       const keyIdx = (currentKeyIndex + attempt) % keys.length;
       const apiKey = keys[keyIdx];
 
       for (const modelId of candidateModels) {
         try {
-          console.log(`[AI Clinical] Full scoped-data analysis via OpenRouter (${modelId}) key #${keyIdx + 1}...`);
+          console.log(`[AI Clinical] Fast clinical analysis via OpenRouter (${modelId}) key #${keyIdx + 1}...`);
           const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
+            signal: AbortSignal.timeout(4000),
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${apiKey}`,
@@ -263,12 +263,12 @@ Respond ONLY with valid JSON (no markdown, no explanation):
               messages: [
                 {
                   role: 'system',
-                  content: 'You are a senior clinical pharmacist AI conducting a medication safety review. Respond ONLY with valid JSON matching the exact schema requested. Be clinically precise about toxic dosages — warfarin 1000mg is lethal (normal max is ~10mg/day).'
+                  content: 'You are a senior clinical pharmacist AI. Analyze the patient prescriptions and output raw JSON ONLY without any markdown formatting or commentary. Include risk_score (0-100), risk_level, summary, toxic_doses, interactions, allergy_conflicts, and recommendations.'
                 },
                 { role: 'user', content: fullPrompt }
               ],
-              temperature: 0.05,
-              max_tokens: 800
+              temperature: 0.1,
+              max_tokens: 1200
             })
           });
 
@@ -284,46 +284,61 @@ Respond ONLY with valid JSON (no markdown, no explanation):
             continue;
           }
 
-        currentKeyIndex = (keyIdx + 1) % keys.length;
+          currentKeyIndex = (keyIdx + 1) % keys.length;
 
-        const cleaned = content.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-        const parsed = JSON.parse(cleaned);
+          // Robust JSON extraction
+          let parsed = null;
+          let cleaned = content.replace(/```(?:json)?/gi, '').trim();
+          const firstBrace = cleaned.indexOf('{');
+          const lastBrace = cleaned.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+          }
+          try {
+            parsed = JSON.parse(cleaned);
+          } catch (pe) {
+            console.warn(`[AI Clinical] JSON parse error from ${modelId}: ${pe.message}. Trying next...`);
+            continue;
+          }
 
-        console.log(`[AI Clinical] Received valid AI response from OpenRouter (${modelId}):`, {
-          risk_score: parsed.risk_score,
-          risk_level: parsed.risk_level,
-          safe: parsed.safe
-        });
+          if (!parsed) continue;
 
-        // Use AI's calculated risk score directly
-        let aiRiskScore = typeof parsed.risk_score === 'number' ? parsed.risk_score : parseInt(parsed.risk_score, 10);
-        if (isNaN(aiRiskScore) || aiRiskScore < 0) {
-          aiRiskScore = parsed.safe ? 0 : 75;
-        }
-        aiRiskScore = Math.min(Math.max(aiRiskScore, 0), 100);
+          console.log(`[AI Clinical] Received valid AI response from OpenRouter (${modelId}):`, {
+            risk_score: parsed.risk_score,
+            risk_level: parsed.risk_level,
+            safe: parsed.safe
+          });
 
-        const aiRiskLevel = parsed.risk_level || (
-          aiRiskScore >= 75 ? 'critical' :
-          aiRiskScore >= 50 ? 'high' :
-          aiRiskScore >= 25 ? 'moderate' :
-          aiRiskScore > 5 ? 'low' : 'safe'
-        );
+          // Use AI's calculated risk score directly
+          let aiRiskScore = typeof parsed.risk_score === 'number' ? parsed.risk_score : parseInt(parsed.risk_score, 10);
+          if (isNaN(aiRiskScore) || aiRiskScore < 0) {
+            aiRiskScore = parsed.safe ? 0 : 75;
+          }
+          aiRiskScore = Math.min(Math.max(aiRiskScore, 0), 100);
 
-        const isSafe = parsed.safe !== undefined ? Boolean(parsed.safe) : (aiRiskScore < 15);
+          const aiRiskLevel = parsed.risk_level || (
+            aiRiskScore >= 75 ? 'critical' :
+            aiRiskScore >= 50 ? 'high' :
+            aiRiskScore >= 25 ? 'moderate' :
+            aiRiskScore > 5 ? 'low' : 'safe'
+          );
 
-        return {
-          ai_source: 'openrouter',
-          model: modelId,
-          risk_score: aiRiskScore,
-          risk_level: aiRiskLevel,
-          summary: parsed.summary || 'AI clinical analysis completed.',
-          toxic_doses: Array.isArray(parsed.toxic_doses) ? parsed.toxic_doses : [],
-          interactions: Array.isArray(parsed.interactions) ? parsed.interactions : [],
-          allergy_conflicts: Array.isArray(parsed.allergy_conflicts) ? parsed.allergy_conflicts : [],
-          contraindications: Array.isArray(parsed.contraindications) ? parsed.contraindications : [],
-          recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
-          safe: isSafe
-        };
+          const isSafe = parsed.safe !== undefined ? Boolean(parsed.safe) : (aiRiskScore < 15);
+
+          return {
+            ai_source: 'openrouter',
+            model: modelId,
+            risk_score: aiRiskScore,
+            risk_level: aiRiskLevel,
+            summary: parsed.summary || 'AI clinical analysis completed.',
+            toxic_doses: Array.isArray(parsed.toxic_doses) ? parsed.toxic_doses : [],
+            interactions: Array.isArray(parsed.interactions) ? parsed.interactions : [],
+            allergy_conflicts: Array.isArray(parsed.allergy_conflicts) ? parsed.allergy_conflicts : [],
+            contraindications: Array.isArray(parsed.contraindications) ? parsed.contraindications : [],
+            recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+            safe: isSafe
+          };
+
         } catch (err) {
           console.warn(`[AI Clinical] Error with model ${modelId} on key #${keyIdx + 1}: ${err.message}. Rotating...`);
         }

@@ -43,8 +43,7 @@ export default function Sidebar({ currentTab, setTab, pendingCount = 0 }) {
     navItems = [
       { id: 'overview', label: 'Dashboard', icon: RiDashboardLine },
       { id: 'find', label: 'Find Patient', icon: RiSearchLine },
-      { id: 'requests', label: 'My Requests', icon: RiSendPlaneLine },
-      { id: 'fraud', label: 'Fraud Alerts', icon: RiAlertLine }
+      { id: 'requests', label: 'My Requests', icon: RiSendPlaneLine }
     ];
   } else if (user.role === 'admin') {
     navItems = [

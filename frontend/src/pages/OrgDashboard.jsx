@@ -299,12 +299,13 @@ export default function OrgDashboard() {
                 variant={pendingRequests.length > 0 ? 'warning' : 'neutral'}
               />
               <StatsCard
-                title="Fraud Flags Triggered"
-                value={fraudFlags.length}
-                subtitle="Logged in audit chain"
-                variant={fraudFlags.length > 0 ? 'negative' : 'neutral'}
+                title="Security Status"
+                value="Verified"
+                subtitle="Cryptographic Identity Active"
+                variant="positive"
               />
             </div>
+
 
             {/* Active Authorizations matching Image 2 Card Frame */}
             <div className="bg-white border border-black rounded-2xl p-6 space-y-4">
@@ -513,61 +514,44 @@ export default function OrgDashboard() {
                   </div>
                 </div>
 
-                {/* Active Security & Fraud Monitoring Banner */}
+                {/* Cryptographic Privacy & Security Guarantee Banner */}
                 <div className="bg-white border border-black rounded-2xl p-6">
                   <div className="flex items-start justify-between pb-3 border-b border-gray-100">
                     <div>
                       <h3 className="text-sm font-medium font-sans text-[#0A0A0A]">
-                        Synchronous Healthcare Fraud & Telemetry Safeguards
+                        Patient Sovereign Data Privacy & Cryptographic Verification
                       </h3>
                       <p className="text-xs font-normal font-sans text-[#555555] mt-0.5">
-                        Active security rules enforced in real time on all access request submissions
+                        Guaranteed zero-trust release of clinical health records
                       </p>
                     </div>
                     <span className="px-2.5 py-0.5 bg-green-50 border border-[#16A34A] text-[#16A34A] rounded-full text-[10px] font-mono font-bold uppercase">
-                      Active
+                      Protected
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-xs font-sans">
                     <div className="p-3 bg-gray-50 border border-black rounded-xl">
                       <span className="font-mono font-bold text-[#0A0A0A] block">
-                        Rule 1: MULTI_ORG_ATTEMPT
+                        Strict Scoped Access Only
                       </span>
                       <p className="text-[#555555] text-[11px] mt-1">
-                        Detects prescription shopping across $\ge 3$ distinct organizations within 60 minutes.
+                        Only categories authorized by the patient in their signed grant are released. Full medical records are never exposed.
                       </p>
                     </div>
 
                     <div className="p-3 bg-gray-50 border border-black rounded-xl">
                       <span className="font-mono font-bold text-[#0A0A0A] block">
-                        Rule 2: DUPLICATE_REQUEST
+                        Instant Revocation Enforcement
                       </span>
                       <p className="text-[#555555] text-[11px] mt-1">
-                        Detects redundant access requests for the same patient within 10 minutes.
-                      </p>
-                    </div>
-
-                    <div className="p-3 bg-gray-50 border border-black rounded-xl">
-                      <span className="font-mono font-bold text-[#0A0A0A] block">
-                        Rule 3: EXPIRED_PRESCRIPTION
-                      </span>
-                      <p className="text-[#555555] text-[11px] mt-1">
-                        Prevents dispensing or accessing prescriptions that have passed their clinical validity date.
-                      </p>
-                    </div>
-
-                    <div className="p-3 bg-gray-50 border border-black rounded-xl">
-                      <span className="font-mono font-bold text-[#0A0A0A] block">
-                        Rule 4: UNVERIFIED_ORG
-                      </span>
-                      <p className="text-[#555555] text-[11px] mt-1">
-                        Automatically flags organizations awaiting administrative identity verification.
+                        Patients retain the sovereign right to revoke data authorization at any second, cutting off access immediately.
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
+
             )}
 
             {/* Found Patient Card & Request Form */}
@@ -776,63 +760,8 @@ export default function OrgDashboard() {
             </div>
           </div>
         )}
-
-        {/* TAB 4: FRAUD ALERTS */}
-        {tab === 'fraud' && (
-          <div className="space-y-6 animate-fadeSlideIn">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-[#0A0A0A] tracking-tight">
-                  Healthcare Fraud & Anomaly Alerts
-                </h1>
-                <p className="text-xs text-[#555555] mt-1">
-                  Automated detection of multi-org shopping, duplicates, and unverified organizations
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {fraudFlags.map((flag) => {
-                const details = typeof flag.details === 'string'
-                  ? JSON.parse(flag.details || '{}')
-                  : (flag.details || {});
-
-                return (
-                  <div
-                    key={flag.id}
-                    className="bg-white border border-black rounded-2xl p-5 hover:border-black/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-mono font-bold text-sm text-[#0A0A0A]">
-                            {flag.rule_triggered}
-                          </span>
-                          <span
-                            className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                              flag.severity === 'high'
-                                ? 'bg-red-50 text-[#EF4444] border border-red-200'
-                                : 'bg-amber-50 text-[#F59E0B] border border-amber-200'
-                            }`}
-                          >
-                            {flag.severity} severity
-                          </span>
-                        </div>
-                        <p className="text-xs text-[#555555] mt-1">
-                          {details.message || 'Anomaly flagged during access evaluation'}
-                        </p>
-                      </div>
-                      <span className="text-xs font-mono text-[#555555]">
-                        {new Date(flag.flagged_at).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </main>
+
 
       {/* VIEW SCOPED DATA MODAL — Full 3-way handshake result */}
       {viewDataModalOpen && scopedDataPayload && (
